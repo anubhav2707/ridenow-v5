@@ -1,0 +1,42 @@
+# RideNow v5 — localhost stack. Deliberately scoped to Postgres+PostGIS and the
+# API only. Self-hosted OSRM/Nominatim (hours-long, 100s of GB) is DEFERRED to
+# the geo story to preserve walking-skeleton discipline.
+name: ridenow-v5
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ridenow
+      POSTGRES_PASSWORD: ridenow
+      POSTGRES_DB: ridenow
+    ports:
+      - "5432:5432"
+    volumes:
+      - ridenow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ridenow -d ridenow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # In-network Postgres host is the compose service name `db`.
+      DATABASE_URL: postgres://ridenow:ridenow@db:5432/ridenow
+      OTP_PROVIDER: mock
+      PAYMENT_PROVIDER: mock
+      GEO_PROVIDER: mock
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  ridenow_pgdata:

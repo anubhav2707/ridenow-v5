@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.vitest/
+
+# Env & secrets (committed template is .env.example)
+.env
+.env.*
+!.env.example
+
+# Drizzle generated artifacts (committed SQL migrations are kept)
+packages/db/drizzle/meta/_journal.json.bak
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Vite
+apps/*/dist/
+apps/*/.vite/

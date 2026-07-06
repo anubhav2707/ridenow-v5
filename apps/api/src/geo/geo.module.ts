@@ -1,13 +1,16 @@
 import { Module } from "@nestjs/common";
-import { GeoService } from "./geo.service";
-import { GEO_PROVIDER } from "./ports/geo-provider";
-import { StubGeoProvider } from "./adapters/stub-geo.provider";
+import { GEO_PROVIDER, type GeoProvider } from "./geo.port";
+import { StubGeoProvider } from "./stub-geo.provider";
+
+/** Selects the geo adapter from GEO_PROVIDER (mock by default). */
+function selectGeoProvider(): GeoProvider {
+  const mode = process.env.GEO_PROVIDER ?? "mock";
+  if (mode === "mock") return new StubGeoProvider();
+  throw new Error(`GEO_PROVIDER="${mode}" is not implemented in the scaffold (deferred to the geo story)`);
+}
 
 @Module({
-  providers: [
-    GeoService,
-    { provide: GEO_PROVIDER, useClass: StubGeoProvider },
-  ],
-  exports: [GeoService],
+  providers: [{ provide: GEO_PROVIDER, useFactory: selectGeoProvider }],
+  exports: [GEO_PROVIDER],
 })
 export class GeoModule {}

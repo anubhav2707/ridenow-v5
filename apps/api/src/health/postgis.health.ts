@@ -1,23 +1,27 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { HealthCheckError, HealthIndicator, type HealthIndicatorResult } from "@nestjs/terminus";
-import { DbReadiness } from "./db-readiness";
+import { pingPostgis } from "@ridenow/db";
+import type { Sql } from "postgres";
+import { DB_SQL } from "../database/database.tokens";
 
-/** Terminus indicator confirming Postgres answers AND PostGIS is installed. */
+/**
+ * Terminus health indicator that confirms BOTH that Postgres answers a query
+ * and that the PostGIS extension is installed and reachable — the readiness
+ * signal the /health endpoint reports.
+ */
 @Injectable()
 export class PostgisHealthIndicator extends HealthIndicator {
-  constructor(private readonly db: DbReadiness) {
+  constructor(@Inject(DB_SQL) private readonly sql: Sql) {
     super();
   }
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     try {
-      const readiness = await this.db.check();
-      return this.getStatus(key, true, { postgisVersion: readiness.postgisVersion });
+      const status = await pingPostgis(this.sql);
+      return this.getStatus(key, true, { postgisVersion: status.postgisVersion });
     } catch (error) {
-      throw new HealthCheckError(
-        "postgis unavailable",
-        this.getStatus(key, false, { message: (error as Error).message }),
-      );
+      const message = error instanceof Error ? error.message : String(error);
+      throw new HealthCheckError("PostGIS check failed", this.getStatus(key, false, { message }));
     }
   }
 }

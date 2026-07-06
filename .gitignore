@@ -1,27 +1,27 @@
-# Dependencies
+# dependencies
 node_modules/
+.pnpm-store/
 
-# Build output
+# build output
 dist/
 build/
 *.tsbuildinfo
 
-# Turbo
+# turbo
 .turbo/
 
-# Test coverage
+# test / coverage
 coverage/
 
-# Env — never commit real secrets. .env.example IS committed.
+# env — real secrets are NEVER committed (.env.example IS committed)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
-# Drizzle generated introspection artifacts (committed migrations live in
-# packages/db/migrations and are NOT ignored)
+# drizzle generated artifacts (hand-written migrations under packages/db/migrations ARE committed)
 packages/db/drizzle/
 
-# Editor / OS
+# editor / os
 .DS_Store
 *.log
 .idea/

@@ -5,31 +5,12 @@ on:
     branches: [main]
   pull_request:
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
 env:
   PNPM_VERSION: 9.15.0
   NODE_VERSION: 20
 
 jobs:
-  install:
-    name: Install (frozen lockfile)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-
   lint:
-    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,11 +22,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
       - run: pnpm lint
 
   typecheck:
-    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,11 +36,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
       - run: pnpm typecheck
 
   test:
-    name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,21 +50,18 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
       - run: pnpm test
 
-  manifests:
-    name: Manifest integrity
+  manifest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - run: node scripts/check-manifests.mjs
+      - run: node scripts/manifest-check.mjs
 
   gitleaks:
-    name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,37 +72,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   smoke:
-    name: Compose up + /health smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Build and start the stack
-        run: |
-          cp .env.example .env
-          docker compose up -d --build
-      - name: Wait for Postgres, then migrate + seed
-        run: |
-          until [ "$(docker inspect -f '{{.State.Health.Status}}' ridenow-v5-db-1)" = "healthy" ]; do sleep 2; done
-          pnpm db:migrate
-          pnpm db:seed
-      - name: Assert GET /health returns 200
-        run: |
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health || true)
-            if [ "$code" = "200" ]; then echo "/health -> 200"; break; fi
-            sleep 2
-          done
-          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health)" = "200"
-      - name: Drive the faked core loop
+      - name: Bring up the stack (Postgres+PostGIS + API)
+        run: docker compose up --build -d
+      - name: Wait for /health to be 200
+        run: bash scripts/wait-for-health.sh
+      - name: Health check returns 200
+        run: curl -fsS http://localhost:3000/health
+      - name: Watch the faked core loop end-to-end
         run: bash scripts/watch-loop.sh
-      - name: Dump logs on failure
-        if: failure()
-        run: docker compose logs
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

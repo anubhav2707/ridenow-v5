@@ -1,45 +1,25 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { parseBody } from "../common/zod";
-import { RidesService } from "./rides.service";
-import { QuoteRequestSchema, StartRequestSchema } from "./dto";
+import { Controller, Get, Inject } from "@nestjs/common";
+import type { Sql } from "postgres";
+import { DB_SQL } from "../database/database.tokens";
 
-/**
- * HTTP surface for the faked core loop. scripts/watch-loop.sh drives these in
- * order to print the trip-state transitions and the resulting ledger entry.
- */
+interface RideRow {
+  id: string;
+  state: string;
+  fare_total_minor: number | null;
+  currency: string;
+}
+
+/** Read-only recent rides — a seam over the persisted core-loop output. */
 @Controller("rides")
 export class RidesController {
-  constructor(private readonly rides: RidesService) {}
+  constructor(@Inject(DB_SQL) private readonly sql: Sql) {}
 
-  @Post("quote")
-  quote(@Body() body: unknown) {
-    const { pickup, dropoff } = parseBody(QuoteRequestSchema, body);
-    return this.rides.quote(pickup, dropoff);
-  }
-
-  @Post(":id/book")
-  book(@Param("id") id: string) {
-    return this.rides.book(id);
-  }
-
-  @Post(":id/accept")
-  accept(@Param("id") id: string) {
-    return this.rides.accept(id);
-  }
-
-  @Post(":id/start")
-  start(@Param("id") id: string, @Body() body: unknown) {
-    const { otp } = parseBody(StartRequestSchema, body);
-    return this.rides.start(id, otp);
-  }
-
-  @Post(":id/complete")
-  complete(@Param("id") id: string) {
-    return this.rides.complete(id);
-  }
-
-  @Get(":id")
-  get(@Param("id") id: string) {
-    return this.rides.getRide(id);
+  @Get()
+  async list(): Promise<RideRow[]> {
+    return this.sql<RideRow[]>`
+      SELECT id, state, fare_total_minor, currency
+      FROM rides
+      ORDER BY created_at DESC
+      LIMIT 20`;
   }
 }

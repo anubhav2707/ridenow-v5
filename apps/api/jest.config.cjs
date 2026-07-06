@@ -1,17 +1,11 @@
-/** @type {import('jest').Config} */
+/** @type {import("jest").Config} */
 module.exports = {
-  preset: "ts-jest",
   testEnvironment: "node",
   rootDir: "src",
-  moduleFileExtensions: ["ts", "js", "json"],
   testRegex: ".*\\.spec\\.ts$",
+  moduleFileExtensions: ["ts", "js", "json"],
   setupFiles: ["reflect-metadata"],
   transform: {
-    "^.+\\.ts$": [
-      "ts-jest",
-      {
-        tsconfig: "<rootDir>/../tsconfig.json",
-      },
-    ],
+    "^.+\\.ts$": ["ts-jest", { tsconfig: "<rootDir>/../tsconfig.json" }],
   },
 };

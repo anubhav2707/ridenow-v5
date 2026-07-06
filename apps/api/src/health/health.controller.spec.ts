@@ -1,50 +1,59 @@
+import { TerminusModule } from "@nestjs/terminus";
 import { Test } from "@nestjs/testing";
-import {
-  TerminusModule,
-  HealthCheckError,
-  type HealthIndicatorResult,
-} from "@nestjs/terminus";
+import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
+import type { Sql } from "postgres";
+import { DB_SQL } from "../database/database.tokens";
 import { HealthController } from "./health.controller";
-import { DbHealthIndicator } from "./db.health";
+import { PostgisHealthIndicator } from "./postgis.health";
 
 /**
- * Covers the /health readiness contract without a live database by overriding
- * the PostGIS indicator. The real indicator's query is exercised by the
- * compose-up smoke gate in CI.
+ * A fake postgres.js `Sql` tag that answers the postgis_version() probe without
+ * a real database, so the readiness endpoint's real logic (controller ->
+ * indicator -> pingPostgis) is exercised in a passing unit test.
  */
-describe("HealthController", () => {
-  async function build(indicator: Partial<DbHealthIndicator>) {
+function fakeSql(rows: unknown[]): Sql {
+  const tag = (): Promise<unknown[]> => Promise.resolve(rows);
+  return tag as unknown as Sql;
+}
+
+describe("GET /health", () => {
+  let app: NestFastifyApplication;
+
+  async function boot(sql: Sql): Promise<NestFastifyApplication> {
     const moduleRef = await Test.createTestingModule({
       imports: [TerminusModule],
       controllers: [HealthController],
-      providers: [{ provide: DbHealthIndicator, useValue: indicator }],
+      providers: [PostgisHealthIndicator, { provide: DB_SQL, useValue: sql }],
     }).compile();
-    return moduleRef.get(HealthController);
+
+    const nestApp = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+    await nestApp.init();
+    await nestApp.getHttpAdapter().getInstance().ready();
+    return nestApp;
   }
 
-  it("returns ok with a PostGIS readiness payload when reachable", async () => {
-    const healthy: HealthIndicatorResult = {
-      database: { status: "up", postgisVersion: "3.4 USE_GEOS=1" },
-    };
-    const isHealthy = jest.fn().mockResolvedValue(healthy);
-    const controller = await build({ isHealthy });
-
-    const result = await controller.check();
-
-    expect(result.status).toBe("ok");
-    expect(result.info?.database?.status).toBe("up");
-    expect(result.info?.database?.postgisVersion).toContain("3.4");
-    expect(isHealthy).toHaveBeenCalledWith("database");
+  afterEach(async () => {
+    await app?.close();
   });
 
-  it("fails the check when PostGIS is unreachable", async () => {
-    const isHealthy = jest.fn().mockRejectedValue(
-      new HealthCheckError("PostGIS check failed", {
-        database: { status: "down", message: "connection refused" },
-      }),
-    );
-    const controller = await build({ isHealthy });
+  it("returns 200 and a readiness payload confirming PostGIS is reachable", async () => {
+    app = await boot(fakeSql([{ postgis_version: "3.4 USE_GEOS=1 USE_PROJ=1" }]));
 
-    await expect(controller.check()).rejects.toBeDefined();
+    const res = await app.inject({ method: "GET", url: "/health" });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.status).toBe("ok");
+    expect(body.info.postgis.status).toBe("up");
+    expect(body.info.postgis.postgisVersion).toContain("3.4");
+  });
+
+  it("returns 503 when PostGIS is not reachable", async () => {
+    app = await boot(fakeSql([])); // no postgis_version row -> pingPostgis throws
+
+    const res = await app.inject({ method: "GET", url: "/health" });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.json().status).toBe("error");
   });
 });

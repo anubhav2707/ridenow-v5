@@ -1,7 +1,7 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createSql, type Sql } from "./client.js";
-import { getDatabaseUrl, loadEnv } from "./env.js";
+import { loadEnv, getDatabaseUrl } from "./env.js";
 
 const MIGRATIONS_DIR = resolve(__dirname, "..", "migrations");
 
@@ -20,8 +20,10 @@ export async function runMigrations(sql: Sql): Promise<string[]> {
     name text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now()
   )`;
+
   const appliedRows = await sql<{ name: string }[]>`SELECT name FROM _migrations`;
   const applied = new Set(appliedRows.map((r) => r.name));
+
   const ran: string[] = [];
   for (const file of migrationFiles()) {
     if (applied.has(file)) continue;
@@ -33,7 +35,10 @@ export async function runMigrations(sql: Sql): Promise<string[]> {
     ran.push(file);
     console.log(`[migrate] applied ${file}`);
   }
-  if (ran.length === 0) console.log("[migrate] nothing to apply — schema is up to date");
+
+  if (ran.length === 0) {
+    console.log("[migrate] nothing to apply — schema is up to date");
+  }
   return ran;
 }
 

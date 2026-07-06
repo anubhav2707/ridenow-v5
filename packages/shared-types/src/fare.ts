@@ -41,13 +41,24 @@ export interface RouteEstimate {
  * Compute a fare quote from a route estimate. Pure and deterministic: all
  * rounding is done on integers, so the same route always yields the same total.
  */
-export function computeFare(route: RouteEstimate, tariff: FareTariff = DEFAULT_TARIFF): FareQuote {
+export function computeFare(
+  route: RouteEstimate,
+  tariff: FareTariff = DEFAULT_TARIFF,
+): FareQuote {
   const km = route.distanceMeters / 1000;
   const minutes = route.durationSeconds / 60;
+
   const baseFare = money(tariff.baseFareMinor, tariff.currency);
-  const distanceComponent = money(Math.round(km * tariff.perKmMinor), tariff.currency);
-  const timeComponent = money(Math.round(minutes * tariff.perMinuteMinor), tariff.currency);
+  const distanceComponent = money(
+    Math.round(km * tariff.perKmMinor),
+    tariff.currency,
+  );
+  const timeComponent = money(
+    Math.round(minutes * tariff.perMinuteMinor),
+    tariff.currency,
+  );
   const total = addMoney(addMoney(baseFare, distanceComponent), timeComponent);
+
   return FareQuoteSchema.parse({
     currency: tariff.currency,
     baseFare,

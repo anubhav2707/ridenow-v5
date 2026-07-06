@@ -43,7 +43,12 @@ export const HAPPY_PATH: readonly TripState[] = [
   "completed",
 ];
 
-const CANCELLABLE: readonly TripState[] = ["requested", "quoted", "booked", "accepted"];
+const CANCELLABLE: readonly TripState[] = [
+  "requested",
+  "quoted",
+  "booked",
+  "accepted",
+];
 
 /** state -> event -> next state. The exhaustive legal-transition table. */
 const TRANSITIONS: Record<TripState, Partial<Record<TripEvent, TripState>>> = {
@@ -71,11 +76,13 @@ export function nextState(state: TripState, event: TripEvent): TripState | null 
 }
 
 export class IllegalTransitionError extends Error {
-  constructor(
-    readonly from: TripState,
-    readonly event: TripEvent,
-  ) {
+  readonly from: TripState;
+  readonly event: TripEvent;
+
+  constructor(from: TripState, event: TripEvent) {
     super(`illegal trip transition: cannot apply ${event} while ${from}`);
+    this.from = from;
+    this.event = event;
     this.name = "IllegalTransitionError";
   }
 }

@@ -9,59 +9,126 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PNPM_VERSION: 9.15.0
+  NODE_VERSION: 20
+
 jobs:
-  lint:
+  install:
+    name: Install (frozen lockfile)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm lint
 
   typecheck:
+    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - run: pnpm run typecheck
+      - run: pnpm build
+      - run: pnpm typecheck
 
   test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - run: pnpm run test
+      - run: pnpm build
+      - run: pnpm test
+
+  manifests:
+    name: Manifest integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: node scripts/check-manifests.mjs
 
   gitleaks:
+    name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: gitleaks secret scan
-        uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v2
         env:
-          GITLEAKS_CONFIG: .gitleaks.toml
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  compose-smoke:
+  smoke:
+    name: Compose up + /health smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Bring up the stack and prove /health + core loop
-        run: bash scripts/smoke.sh
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build and start the stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build
+      - name: Wait for Postgres, then migrate + seed
+        run: |
+          until [ "$(docker inspect -f '{{.State.Health.Status}}' ridenow-v5-db-1)" = "healthy" ]; do sleep 2; done
+          pnpm db:migrate
+          pnpm db:seed
+      - name: Assert GET /health returns 200
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health || true)
+            if [ "$code" = "200" ]; then echo "/health -> 200"; break; fi
+            sleep 2
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health)" = "200"
+      - name: Drive the faked core loop
+        run: bash scripts/watch-loop.sh
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs

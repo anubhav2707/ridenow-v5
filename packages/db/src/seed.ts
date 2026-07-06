@@ -1,11 +1,21 @@
 import { createSql, type Sql } from "./client.js";
-import { getDatabaseUrl, loadEnv } from "./env.js";
+import { loadEnv, getDatabaseUrl } from "./env.js";
 
 /** Deterministic fixtures — a rider and two KYC-approved drivers near SF. */
 const RIDERS = [{ phone: "+15551230001" }];
 const DRIVERS = [
-  { phone: "+15559990001", displayName: "Ada Driver", lng: -122.4194, lat: 37.7749 },
-  { phone: "+15559990002", displayName: "Grace Driver", lng: -122.4094, lat: 37.7849 },
+  {
+    phone: "+15559990001",
+    displayName: "Ada Driver",
+    lng: -122.4194,
+    lat: 37.7749,
+  },
+  {
+    phone: "+15559990002",
+    displayName: "Grace Driver",
+    lng: -122.4094,
+    lat: 37.7849,
+  },
 ];
 
 /**
@@ -34,9 +44,16 @@ export async function runSeed(sql: Sql): Promise<void> {
         is_online = EXCLUDED.is_online,
         last_location = EXCLUDED.last_location`;
   }
-  const drivers = await sql<{ count: string }[]>`SELECT count(*)::text AS count FROM drivers`;
-  const riders = await sql<{ count: string }[]>`SELECT count(*)::text AS count FROM riders`;
-  console.log(`[seed] ${riders[0]?.count ?? "0"} rider(s), ${drivers[0]?.count ?? "0"} driver(s) present`);
+
+  const drivers = await sql<
+    { count: string }[]
+  >`SELECT count(*)::text AS count FROM drivers`;
+  const riders = await sql<
+    { count: string }[]
+  >`SELECT count(*)::text AS count FROM riders`;
+  console.log(
+    `[seed] ${riders[0]?.count ?? "0"} rider(s), ${drivers[0]?.count ?? "0"} driver(s) present`,
+  );
 }
 
 async function main(): Promise<void> {

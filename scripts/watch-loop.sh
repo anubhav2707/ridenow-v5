@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
-# Watch the faked core loop end-to-end: prints the ordered trip-state transitions
-# new -> requested -> quoted -> booked -> accepted -> started -> completed and the
-# resulting earnings ledger entry. Requires the stack to be up (`make up`).
+# Drive the FAKED core loop through the running API and print the ordered
+# trip-state transitions and the resulting earnings ledger entry.
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:3000}"
+BASE_URL="${API_BASE_URL:-http://localhost:3000}"
 
-echo "==> GET ${BASE_URL}/health"
-curl -fsS "${BASE_URL}/health"
-echo
-echo
+echo "[watch-loop] POST ${BASE_URL}/core-loop/run"
+RESPONSE="$(curl -fsS -X POST "${BASE_URL}/core-loop/run" -H 'content-type: application/json')"
 
-echo "==> GET ${BASE_URL}/loop/watch"
-curl -fsS "${BASE_URL}/loop/watch"
+if command -v jq >/dev/null 2>&1; then
+  echo "[watch-loop] trip-state transitions:"
+  echo "${RESPONSE}" | jq -r '.transitions | join(" -> ")'
+  echo "[watch-loop] earnings ledger entry:"
+  echo "${RESPONSE}" | jq '.ledgerEntry'
+else
+  # jq not installed — print the raw payload (still shows transitions + ledger).
+  echo "${RESPONSE}"
+fi

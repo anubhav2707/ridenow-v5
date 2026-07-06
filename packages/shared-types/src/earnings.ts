@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { MoneySchema, applyBasisPoints, subtractMoney, type Money } from "./money.js";
+import {
+  MoneySchema,
+  applyBasisPoints,
+  subtractMoney,
+  type Money,
+} from "./money.js";
 
 /** Platform take rate in basis points (2000 bps === 20%). */
 export const DEFAULT_COMMISSION_BPS = 2000;
@@ -31,7 +36,10 @@ export interface TakeHome {
  * to the nearest minor unit and take-home is the exact remainder, so the two
  * always sum back to the gross with no rounding drift.
  */
-export function computeTakeHome(gross: Money, commissionBps = DEFAULT_COMMISSION_BPS): TakeHome {
+export function computeTakeHome(
+  gross: Money,
+  commissionBps: number = DEFAULT_COMMISSION_BPS,
+): TakeHome {
   const commission = applyBasisPoints(gross, commissionBps);
   const netTakeHome = subtractMoney(gross, commission);
   return { commission, netTakeHome };

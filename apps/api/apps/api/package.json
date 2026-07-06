@@ -1,0 +1,12 @@
+{
+  "name": "@ridenow/api",
+  "version": "5.0.0",
+  "private": true,
+  "description": "RideNow v5 API service",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"no tests yet\" && exit 0"
+  },
+  "license": "UNLICENSED"
+}

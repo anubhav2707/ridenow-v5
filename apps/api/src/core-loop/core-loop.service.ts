@@ -1,106 +1,77 @@
-import { Inject, Injectable } from "@nestjs/common";
-import {
-  DEFAULT_COMMISSION_BPS,
-  computeFare,
-  computeTakeHome,
-  formatMoney,
-  applyEvent,
-  type EarningsLedgerEntry,
-  type FareQuote,
-  type TripEvent,
-  type TripState,
+import { Injectable } from "@nestjs/common";
+import type {
+  EarningsLedgerEntry,
+  FareQuote,
+  LngLat,
+  TripState,
 } from "@ridenow/shared-types";
-import {
-  GEO_PROVIDER,
-  OTP_PROVIDER,
-  PAYMENT_PROVIDER,
-  type GeoPort,
-  type OtpPort,
-  type PaymentPort,
-  type PaymentResult,
-} from "../providers/ports";
+import { RidesService } from "../rides/rides.service";
+import { GeoService } from "../geo/geo.service";
+import { PaymentsService } from "../payments/payments.service";
+import { DriversService } from "../drivers/drivers.service";
+import { EarningsService } from "../earnings/earnings.service";
 
 export interface CoreLoopResult {
+  rideId: string;
   transitions: TripState[];
   quote: FareQuote;
-  payment: PaymentResult;
+  driverId: string;
+  authorizationId: string;
   ledgerEntry: EarningsLedgerEntry;
-  otp: { sentTo: string; devCode: string };
 }
 
-const DRIVE_EVENTS: readonly TripEvent[] = [
-  "REQUEST",
-  "QUOTE",
-  "BOOK",
-  "ACCEPT",
-  "START",
-  "COMPLETE",
-];
-
-// Fixed demo pickup/dropoff near SF (matches the seeded drivers).
-const PICKUP = { lng: -122.4194, lat: 37.7749 };
-const DROPOFF = { lng: -122.4094, lat: 37.7849 };
+const PICKUP: LngLat = { lng: -122.4194, lat: 37.7749 };
+const DROPOFF: LngLat = { lng: -122.4094, lat: 37.7849 };
 
 /**
- * The FAKED vertical slice of the core loop. Real trip-state-machine transitions
- * and real money math run over the deterministic MOCK adapters — no DB writes,
- * no external calls. This is what makes the loop "runnable end-to-end even faked".
+ * The FAKED core loop: a real vertical slice that drives one ride through the
+ * shared trip state machine (new -> requested -> quoted -> booked -> accepted ->
+ * started -> completed) over the MOCK adapters (stub geo, fake payments), then
+ * records the earnings ledger entry. No product features — just proof the
+ * boundaries fit together end-to-end.
  */
 @Injectable()
 export class CoreLoopService {
   constructor(
-    @Inject(OTP_PROVIDER) private readonly otp: OtpPort,
-    @Inject(PAYMENT_PROVIDER) private readonly payments: PaymentPort,
-    @Inject(GEO_PROVIDER) private readonly geo: GeoPort,
+    private readonly rides: RidesService,
+    private readonly geo: GeoService,
+    private readonly payments: PaymentsService,
+    private readonly drivers: DriversService,
+    private readonly earnings: EarningsService,
   ) {}
 
   async run(): Promise<CoreLoopResult> {
-    const phone = "+15551230001";
-    const otp = await this.otp.sendOtp(phone);
-    await this.otp.verifyOtp(phone, otp.devCode);
+    const ride = this.rides.create(); // 'new'
+    const transitions: TripState[] = [ride.state];
 
-    const route = await this.geo.estimateRoute(PICKUP, DROPOFF);
-    const quote = computeFare(route);
+    transitions.push(this.rides.apply(ride.id, "REQUEST").state);
 
-    let state: TripState = "new";
-    const transitions: TripState[] = [state];
-    for (const event of DRIVE_EVENTS) {
-      state = applyEvent(state, event);
-      transitions.push(state);
-    }
+    const quote = await this.geo.quote(PICKUP, DROPOFF);
+    transitions.push(this.rides.apply(ride.id, "QUOTE").state);
 
-    const rideId = "ride-demo";
-    const payment = await this.payments.charge(quote.total, rideId);
-    const { commission, netTakeHome } = computeTakeHome(quote.total);
+    const auth = await this.payments.authorize(quote.total, ride.id);
+    transitions.push(this.rides.apply(ride.id, "BOOK").state);
 
-    const ledgerEntry: EarningsLedgerEntry = {
-      entryId: "ledger-demo",
-      driverId: "driver-demo",
-      rideId,
-      gross: quote.total,
-      commission,
-      netTakeHome,
-      commissionBps: DEFAULT_COMMISSION_BPS,
-      createdAt: new Date().toISOString(),
+    const driverId =
+      (await this.geo.nearestDriverId(PICKUP)) ?? "seed-driver-ada";
+    this.drivers.acceptRide(driverId, ride.id);
+    transitions.push(this.rides.apply(ride.id, "ACCEPT").state);
+
+    // OTP trip start (mocked) then GPS/drive.
+    transitions.push(this.rides.apply(ride.id, "START").state);
+
+    await this.payments.capture(auth.authorizationId);
+    transitions.push(this.rides.apply(ride.id, "COMPLETE").state);
+
+    const ledgerEntry = this.earnings.record(driverId, ride.id, quote.total);
+
+    return {
+      rideId: ride.id,
+      transitions,
+      quote,
+      driverId,
+      authorizationId: auth.authorizationId,
+      ledgerEntry,
     };
-
-    return { transitions, quote, payment, ledgerEntry, otp };
-  }
-
-  /** A ready-made human-readable summary for scripts/watch-loop.sh (text/plain). */
-  async runText(): Promise<string> {
-    const r = await this.run();
-    return [
-      "RideNow v5 — faked core loop (mock adapters, no secrets)",
-      `otp:        sent to ${r.otp.sentTo}, dev code ${r.otp.devCode}`,
-      `trip state: ${r.transitions.join(" -> ")}`,
-      `fare:       total ${formatMoney(r.quote.total)} ` +
-        `(base ${formatMoney(r.quote.baseFare)} + dist ${formatMoney(r.quote.distanceComponent)} + time ${formatMoney(r.quote.timeComponent)})`,
-      `payment:    ${r.payment.paymentId} ${r.payment.status} ${formatMoney(r.payment.amount)}`,
-      `earnings:   gross ${formatMoney(r.ledgerEntry.gross)}, ` +
-        `commission ${formatMoney(r.ledgerEntry.commission)} (${r.ledgerEntry.commissionBps} bps), ` +
-        `net take-home ${formatMoney(r.ledgerEntry.netTakeHome)}`,
-      "",
-    ].join("\n");
   }
 }

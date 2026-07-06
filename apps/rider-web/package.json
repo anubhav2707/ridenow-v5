@@ -5,26 +5,33 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
-    "test": "echo \"no unit tests for rider-web yet\""
+    "test": "vitest run"
   },
   "dependencies": {
     "@ridenow/shared-types": "workspace:*",
-    "@tanstack/react-query": "^5.62.11",
-    "maplibre-gl": "^4.7.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "@tanstack/react-query": "5.101.2",
+    "maplibre-gl": "4.7.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@ridenow/config": "workspace:*",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
-    "@vitejs/plugin-react": "^4.3.4",
-    "eslint": "^9.17.0",
-    "typescript": "^5.7.2",
-    "vite": "^5.4.11"
+    "@testing-library/dom": "10.4.0",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.1.0",
+    "@testing-library/user-event": "14.5.2",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "4.7.0",
+    "eslint": "9.39.4",
+    "jsdom": "25.0.1",
+    "typescript": "5.9.3",
+    "vite": "5.4.21",
+    "vitest": "2.1.9"
   }
 }

@@ -2,40 +2,43 @@ import { Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import {
   computeTakeHome,
+  DEFAULT_COMMISSION_BPS,
+  EarningsLedgerEntrySchema,
   type EarningsLedgerEntry,
   type Money,
 } from "@ridenow/shared-types";
-import { AppConfig } from "../config/app-config";
 
 /**
- * Transparent earnings ledger, faked in memory. Records exactly how each trip's
- * gross fare splits into platform commission and driver take-home.
+ * The transparent earnings ledger. Each completed trip records exactly how the
+ * gross fare split into platform commission and driver take-home. In-memory in
+ * the skeleton; persisted to `earnings_ledger` in the earnings feature story.
  */
 @Injectable()
 export class EarningsService {
-  private readonly ledger = new Map<string, EarningsLedgerEntry[]>();
+  private readonly entries: EarningsLedgerEntry[] = [];
 
-  constructor(private readonly cfg: AppConfig) {}
-
-  recordTrip(driverId: string, rideId: string, gross: Money): EarningsLedgerEntry {
-    const { commission, netTakeHome } = computeTakeHome(gross, this.cfg.commissionBps);
-    const entry: EarningsLedgerEntry = {
-      entryId: randomUUID(),
+  record(
+    driverId: string,
+    rideId: string,
+    gross: Money,
+    commissionBps: number = DEFAULT_COMMISSION_BPS,
+  ): EarningsLedgerEntry {
+    const { commission, netTakeHome } = computeTakeHome(gross, commissionBps);
+    const entry = EarningsLedgerEntrySchema.parse({
+      entryId: `led_${randomUUID()}`,
       driverId,
       rideId,
       gross,
       commission,
       netTakeHome,
-      commissionBps: this.cfg.commissionBps,
+      commissionBps,
       createdAt: new Date().toISOString(),
-    };
-    const existing = this.ledger.get(driverId) ?? [];
-    existing.push(entry);
-    this.ledger.set(driverId, existing);
+    });
+    this.entries.push(entry);
     return entry;
   }
 
-  getLedger(driverId: string): EarningsLedgerEntry[] {
-    return this.ledger.get(driverId) ?? [];
+  ledgerFor(driverId: string): EarningsLedgerEntry[] {
+    return this.entries.filter((e) => e.driverId === driverId);
   }
 }

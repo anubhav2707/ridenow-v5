@@ -1,42 +1,50 @@
-# RideNow v5 — one-command local stack.
-.PHONY: up down logs migrate seed reset demo smoke
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
 
-## up: build + start Postgres+PostGIS and the API, wait for health, then migrate + seed.
-up:
+.PHONY: help install up down logs migrate seed reset watch smoke e2e
+
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+
+install: ## Install dependencies from the committed lockfile
+	pnpm install --frozen-lockfile
+
+up: ## Bring up the full stack (Postgres+PostGIS + API), migrate, seed
+	@test -f .env || cp .env.example .env
 	docker compose up -d --build
-	@echo "[make] waiting for API /health to return 200..."
-	@for i in $$(seq 1 60); do \
-	  if curl -fsS http://localhost:3000/health >/dev/null 2>&1; then echo "[make] API healthy"; break; fi; \
-	  sleep 2; \
-	done
-	docker compose exec -T api pnpm --filter @ridenow/db run migrate
-	docker compose exec -T api pnpm --filter @ridenow/db run seed
-	@echo "[make] stack is up — run 'make demo' to watch the faked core loop"
+	@echo "[up] waiting for Postgres to become healthy..."
+	@until [ "$$(docker inspect -f '{{.State.Health.Status}}' ridenow-v5-db-1 2>/dev/null)" = "healthy" ]; do sleep 2; done
+	pnpm db:migrate
+	pnpm db:seed
+	@echo "[up] waiting for API /health ..."
+	@until curl -fsS http://localhost:3000/health >/dev/null 2>&1; do sleep 2; done
+	@echo "[up] stack is up. API: http://localhost:3000/health"
+	@echo "[up] run 'make watch' to drive the faked core loop."
 
-## migrate: apply pending SQL migrations inside the API container.
-migrate:
-	docker compose exec -T api pnpm --filter @ridenow/db run migrate
-
-## seed: seed deterministic fixtures inside the API container.
-seed:
-	docker compose exec -T api pnpm --filter @ridenow/db run seed
-
-## reset: drop + re-migrate + re-seed the local DB (refuses non-local DATABASE_URL).
-reset:
-	docker compose exec -T api pnpm --filter @ridenow/db run reset
-
-## demo: curl the faked core loop and print the trip-state transitions + ledger.
-demo:
-	BASE_URL=http://localhost:3000 bash scripts/watch-loop.sh
-
-## smoke: full compose-up + health + core-loop check (used by CI).
-smoke:
-	bash scripts/smoke.sh
-
-## down: stop the stack and remove volumes.
-down:
+down: ## Tear down the stack and volumes
 	docker compose down -v
 
-## logs: tail all container logs.
-logs:
-	docker compose logs -f
+logs: ## Tail API logs
+	docker compose logs -f api
+
+migrate: ## Apply DB migrations
+	pnpm db:migrate
+
+seed: ## Seed deterministic fixtures
+	pnpm db:seed
+
+reset: ## Drop, re-migrate and re-seed the local DB (refuses non-local URLs)
+	pnpm db:reset
+
+watch: ## Drive the faked core loop and print the trip-state transitions + ledger
+	bash scripts/watch-loop.sh
+
+smoke: ## Bring up the stack and assert GET /health returns 200
+	$(MAKE) up
+	@code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health); \
+		test "$$code" = "200" && echo "[smoke] /health -> 200 OK" || (echo "[smoke] /health -> $$code" && exit 1)
+
+e2e: ## Full local proof: stack up + health 200 + core loop
+	$(MAKE) up
+	$(MAKE) watch

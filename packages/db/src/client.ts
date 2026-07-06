@@ -15,20 +15,20 @@ export function createDb(databaseUrl: string) {
   return { db: drizzle(sql, { schema }), sql };
 }
 
-export interface PostgisReadiness {
-  ok: boolean;
-  postgisVersion: string;
-}
-
 /**
  * Readiness probe used by the API /health endpoint: confirms both that Postgres
  * answers a query AND that the PostGIS extension is installed and reachable.
  */
-export async function pingPostgis(sql: Sql): Promise<PostgisReadiness> {
-  const rows = await sql<{ postgis_version: string }[]>`SELECT postgis_version() AS postgis_version`;
+export async function pingPostgis(
+  sql: Sql,
+): Promise<{ ok: true; postgisVersion: string }> {
+  const rows = await sql<{ postgis_version: string }[]>`
+    SELECT postgis_version() AS postgis_version`;
   const version = rows[0]?.postgis_version;
   if (!version) {
-    throw new Error("PostGIS not available: postgis_version() returned no rows");
+    throw new Error(
+      "PostGIS not available: postgis_version() returned no rows",
+    );
   }
   return { ok: true, postgisVersion: version };
 }

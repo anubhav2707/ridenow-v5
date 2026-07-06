@@ -1,13 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "outDir": "./dist",
-    "composite": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "outDir": "dist",
+    "rootDir": "src",
     "types": ["node"]
   },
-  "references": [{ "path": "../shared-types" }],
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }

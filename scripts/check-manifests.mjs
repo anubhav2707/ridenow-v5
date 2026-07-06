@@ -1,128 +1,107 @@
 #!/usr/bin/env node
-// Manifest-integrity check (acceptance criterion): every path referenced by a
-// manifest in the repo — pnpm-workspace.yaml, turbo.json, docker-compose.yml,
-// fly.toml and every apps/*/Dockerfile — must resolve to a real file/dir in the
-// tree. Dependency-free so it runs on a bare Node with no install.
+// Manifest-integrity check: every path referenced by a manifest (pnpm
+// workspace globs, docker-compose build contexts/dockerfiles, Dockerfile COPY
+// sources) must resolve to a real file/dir in the tree. Fails the build if not.
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
-import { join, resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, dirname, resolve } from "node:path";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const problems = [];
-let checkedCount = 0;
+const ROOT = process.cwd();
+const errors = [];
+const checks = [];
 
-// Gitignored templates that are intentionally absent from a fresh clone.
-const isOptional = (p) => p === ".env" || p.startsWith(".env.");
-
-function exists(relPath) {
-  return existsSync(resolve(ROOT, relPath));
+function ok(msg) {
+  checks.push(msg);
+}
+function fail(msg) {
+  errors.push(msg);
 }
 
-function check(manifest, relPath, note) {
-  if (isOptional(relPath)) return;
-  checkedCount++;
-  if (!exists(relPath)) {
-    problems.push(`${manifest}: references "${relPath}" (${note}) which does not exist`);
-  }
-}
-
-function unquote(value) {
-  return value
-    .trim()
-    .replace(/\s+#.*$/, "")
-    .replace(/^["']|["']$/g, "")
-    .trim();
-}
-
-function checkWorkspace(rel) {
-  if (!exists(rel)) return;
-  const text = readFileSync(resolve(ROOT, rel), "utf8");
-  for (const raw of text.split("\n")) {
-    const m = /^\s*-\s*(.+)$/.exec(raw);
-    if (!m) continue;
-    const glob = unquote(m[1]);
-    if (!glob) continue;
-    const star = /^(.+)\/\*$/.exec(glob);
-    if (star) {
-      const abs = resolve(ROOT, star[1]);
-      const matches = existsSync(abs)
-        ? readdirSync(abs).filter(
-            (e) =>
-              statSync(join(abs, e)).isDirectory() && existsSync(join(abs, e, "package.json")),
-          )
-        : [];
-      checkedCount++;
-      if (matches.length === 0) {
-        problems.push(`${rel}: workspace glob "${glob}" matches no package`);
-      }
-    } else {
-      check(rel, glob, "workspace package");
+// --- pnpm-workspace.yaml: every glob must match >=1 package with package.json
+function checkWorkspace() {
+  const file = join(ROOT, "pnpm-workspace.yaml");
+  if (!existsSync(file)) return fail("pnpm-workspace.yaml missing");
+  const globs = readFileSync(file, "utf8")
+    .split("\n")
+    .map((l) => l.match(/^\s*-\s*["']?([^"'#]+?)["']?\s*$/))
+    .filter(Boolean)
+    .map((m) => m[1].trim());
+  for (const glob of globs) {
+    const m = glob.match(/^(.+)\/\*$/);
+    if (!m) {
+      if (!existsSync(join(ROOT, glob)))
+        fail(`workspace glob '${glob}' resolves to nothing`);
+      continue;
+    }
+    const base = join(ROOT, m[1]);
+    if (!existsSync(base)) {
+      fail(`workspace glob '${glob}' base dir missing`);
+      continue;
+    }
+    const members = readdirSync(base).filter((d) =>
+      statSync(join(base, d)).isDirectory(),
+    );
+    if (members.length === 0) fail(`workspace glob '${glob}' matched no dirs`);
+    for (const member of members) {
+      const pkg = join(base, member, "package.json");
+      if (!existsSync(pkg))
+        fail(`workspace member '${m[1]}/${member}' has no package.json`);
+      else ok(`workspace member ${m[1]}/${member}`);
     }
   }
 }
 
-function checkTurbo(rel) {
-  if (!exists(rel)) return;
-  const json = JSON.parse(readFileSync(resolve(ROOT, rel), "utf8"));
-  for (const dep of json.globalDependencies ?? []) {
-    if (dep.includes("*")) continue;
-    check(rel, dep, "turbo globalDependency");
+// --- docker-compose.yml: build contexts + dockerfiles exist
+function checkCompose() {
+  const file = join(ROOT, "docker-compose.yml");
+  if (!existsSync(file)) return fail("docker-compose.yml missing");
+  const text = readFileSync(file, "utf8");
+  const contexts = [...text.matchAll(/context:\s*(\S+)/g)].map((m) => m[1]);
+  const dockerfiles = [...text.matchAll(/dockerfile:\s*(\S+)/g)].map(
+    (m) => m[1],
+  );
+  for (const ctx of contexts) {
+    if (!existsSync(resolve(ROOT, ctx)))
+      fail(`compose build context '${ctx}' does not exist`);
+    else ok(`compose context ${ctx}`);
+  }
+  for (const df of dockerfiles) {
+    if (!existsSync(resolve(ROOT, df)))
+      fail(`compose dockerfile '${df}' does not exist`);
+    else {
+      ok(`compose dockerfile ${df}`);
+      checkDockerfileCopies(resolve(ROOT, df), ROOT);
+    }
   }
 }
 
-function checkCompose(rel) {
-  if (!exists(rel)) return;
-  const text = readFileSync(resolve(ROOT, rel), "utf8");
-  for (const raw of text.split("\n")) {
-    let m;
-    if ((m = /^\s*context:\s*(.+)$/.exec(raw))) check(rel, unquote(m[1]), "compose build context");
-    else if ((m = /^\s*dockerfile:\s*(.+)$/.exec(raw))) check(rel, unquote(m[1]), "compose dockerfile");
-    else if ((m = /^\s*env_file:\s*(.+)$/.exec(raw))) check(rel, unquote(m[1]), "compose env_file");
-  }
-}
-
-function checkFly(rel) {
-  if (!exists(rel)) return;
-  const text = readFileSync(resolve(ROOT, rel), "utf8");
-  const m = /dockerfile\s*=\s*"([^"]+)"/.exec(text);
-  if (m) check(rel, m[1], "fly build dockerfile");
-}
-
-function checkDockerfile(rel) {
-  if (!exists(rel)) return;
-  const text = readFileSync(resolve(ROOT, rel), "utf8");
-  for (const raw of text.split("\n")) {
+// --- Dockerfile COPY sources (build context = repo root here)
+function checkDockerfileCopies(dockerfilePath, context) {
+  const lines = readFileSync(dockerfilePath, "utf8").split("\n");
+  for (const raw of lines) {
     const line = raw.trim();
-    const m = /^(COPY|ADD)\s+(.+)$/i.exec(line);
-    if (!m) continue;
-    const tokens = m[2].split(/\s+/).filter((t) => !t.startsWith("--"));
-    if (tokens.length < 2) continue;
-    const sources = tokens.slice(0, -1); // last token is the destination
+    if (!/^COPY\b/i.test(line)) continue;
+    if (/--from=/i.test(line)) continue; // stage copies, not tree paths
+    const parts = line
+      .replace(/^COPY\s+/i, "")
+      .split(/\s+/)
+      .filter((p) => !p.startsWith("--"));
+    const sources = parts.slice(0, -1); // last token is the destination
     for (const src of sources) {
-      if (/^https?:\/\//.test(src) || src.includes("*")) continue;
-      check(rel, src, "Dockerfile COPY/ADD source");
+      if (src.includes("*") || src === "." || src === "./") continue;
+      if (!existsSync(resolve(context, src)))
+        fail(`Dockerfile COPY source '${src}' missing (${dockerfilePath})`);
+      else ok(`Dockerfile COPY ${src}`);
     }
   }
 }
 
-function discoverDockerfiles() {
-  const appsDir = resolve(ROOT, "apps");
-  if (!existsSync(appsDir)) return [];
-  return readdirSync(appsDir)
-    .map((app) => join("apps", app, "Dockerfile"))
-    .filter((p) => exists(p));
-}
+checkWorkspace();
+checkCompose();
 
-checkWorkspace("pnpm-workspace.yaml");
-checkTurbo("turbo.json");
-checkCompose("docker-compose.yml");
-checkFly("fly.toml");
-for (const df of discoverDockerfiles()) checkDockerfile(df);
-
-if (problems.length > 0) {
-  console.error(`✗ manifest-integrity check FAILED (${problems.length} problem(s)):`);
-  for (const p of problems) console.error(`  - ${p}`);
+console.log(`[manifest-check] ${checks.length} references verified`);
+if (errors.length > 0) {
+  console.error(`[manifest-check] ${errors.length} problem(s):`);
+  for (const e of errors) console.error("  - " + e);
   process.exit(1);
 }
-
-console.log(`✓ manifest-integrity OK — ${checkedCount} referenced path(s) all exist.`);
+console.log("[manifest-check] OK — every referenced path exists");

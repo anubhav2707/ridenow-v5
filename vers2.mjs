@@ -1,0 +1,12 @@
+import fs from 'fs';
+const read = (base, p) => { try { return JSON.parse(fs.readFileSync(base + '/' + p + '/package.json')).version } catch (e) { return '?' } };
+console.log('=== db deps ===');
+for (const p of ['postgres', 'drizzle-orm', 'drizzle-kit', 'dotenv', 'tsx', '@types/node']) console.log(p + ' = ' + read('packages/db/node_modules', p));
+console.log('=== root exact ===');
+for (const p of ['typescript', 'turbo', 'tsx', 'eslint', 'prettier', 'typescript-eslint', 'eslint-config-prettier', 'eslint-plugin-react-hooks', 'eslint-plugin-react-refresh', '@eslint/js']) console.log(p + ' = ' + read('node_modules', p));
+console.log('=== api deps ===');
+for (const p of ['@nestjs/core', '@nestjs/common', '@nestjs/platform-fastify', '@nestjs/terminus', '@nestjs/testing', '@nestjs/platform-socket.io', '@nestjs/websockets', 'reflect-metadata', 'rxjs', 'socket.io', 'zod', 'jest', 'ts-jest', '@types/jest', '@types/node', 'supertest', '@types/supertest', 'source-map-support']) console.log(p + ' = ' + read('apps/api/node_modules', p));
+console.log('=== rider-web deps ===');
+for (const p of ['react', 'react-dom', 'vite', '@vitejs/plugin-react', 'maplibre-gl', '@tanstack/react-query', '@types/react', '@types/react-dom', 'vitest', '@testing-library/react', '@testing-library/user-event', '@testing-library/jest-dom', 'jsdom', 'zod']) console.log(p + ' = ' + read('apps/rider-web/node_modules', p));
+console.log('=== config deps ===');
+for (const p of ['eslint', 'prettier', 'typescript-eslint', '@eslint/js', 'eslint-config-prettier', 'globals']) console.log(p + ' = ' + read('packages/config/node_modules', p));

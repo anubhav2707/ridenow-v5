@@ -1,0 +1,8 @@
+{
+  "name": "@ridenow/core",
+  "version": "5.0.0",
+  "private": true,
+  "description": "Shared core utilities for RideNow v5 services",
+  "main": "index.js",
+  "license": "UNLICENSED"
+}

@@ -14,7 +14,14 @@ export function getDatabaseUrl(): string {
 }
 
 /** Hosts we consider "local" and therefore safe to drop/reset. */
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", "db", "postgres"]);
+const LOCAL_HOSTS = new Set([
+  "localhost",
+  "127.0.0.1",
+  "::1",
+  "0.0.0.0",
+  "db",
+  "postgres",
+]);
 
 /**
  * Guard rail for destructive operations: refuse to run against anything that

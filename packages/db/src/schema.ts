@@ -14,7 +14,7 @@ import {
  * migration rewrite. Values are read/written through raw ST_* SQL in the
  * skeleton; the driver mapping lands with the query work.
  */
-export const geographyPoint = customType<{ data: string; driverData: string }>({
+export const geographyPoint = customType<{ data: string }>({
   dataType() {
     return "geography(Point,4326)";
   },
@@ -23,7 +23,9 @@ export const geographyPoint = customType<{ data: string; driverData: string }>({
 export const riders = pgTable("riders", {
   id: uuid("id").primaryKey().defaultRandom(),
   phone: text("phone").notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const drivers = pgTable("drivers", {
@@ -35,7 +37,9 @@ export const drivers = pgTable("drivers", {
   isOnline: boolean("is_online").notNull().default(false),
   // last known GPS ping — GiST-indexed in the migration.
   lastLocation: geographyPoint("last_location"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const rides = pgTable("rides", {
@@ -48,8 +52,12 @@ export const rides = pgTable("rides", {
   // fare stored as integer minor units — never a float.
   fareTotalMinor: integer("fare_total_minor"),
   currency: text("currency").notNull().default("USD"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const earningsLedger = pgTable("earnings_ledger", {
@@ -63,7 +71,9 @@ export const earningsLedger = pgTable("earnings_ledger", {
   netMinor: integer("net_minor").notNull(),
   commissionBps: integer("commission_bps").notNull(),
   currency: text("currency").notNull().default("USD"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export const schema = { riders, drivers, rides, earningsLedger };

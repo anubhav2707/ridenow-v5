@@ -1,6 +1,7 @@
--- 0000_init — enable PostGIS and pre-shape the schema the feature stories need.
--- Authored by hand (drizzle-kit cannot emit CREATE EXTENSION) and applied by
--- src/migrate.ts. Idempotent so it is safe to re-run.
+-- RideNow v5 initial schema.
+-- Enables PostGIS and pre-shapes the nearest-driver geo query (the GiST index
+-- on drivers.last_location) so the geo story's KNN / ST_DWithin lookup drops in
+-- without a migration rewrite. Money is integer minor units everywhere.
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
@@ -16,15 +17,13 @@ CREATE TABLE IF NOT EXISTS drivers (
   display_name  text NOT NULL,
   kyc_status    text NOT NULL DEFAULT 'pending',
   is_online     boolean NOT NULL DEFAULT false,
-  -- last known GPS ping; core to the nearest-driver query.
   last_location geography(Point, 4326),
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
--- GiST index so the hot nearest-driver KNN / ST_DWithin query drops in later
--- without a migration rewrite.
+-- Hot path for "nearest available driver" — GiST over the geography column.
 CREATE INDEX IF NOT EXISTS drivers_last_location_gix
-  ON drivers USING GIST (last_location);
+  ON drivers USING gist (last_location);
 
 CREATE TABLE IF NOT EXISTS rides (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,7 +32,6 @@ CREATE TABLE IF NOT EXISTS rides (
   state            text NOT NULL DEFAULT 'new',
   pickup           geography(Point, 4326),
   dropoff          geography(Point, 4326),
-  -- integer minor units — never a float.
   fare_total_minor integer,
   currency         text NOT NULL DEFAULT 'USD',
   created_at       timestamptz NOT NULL DEFAULT now(),
@@ -41,13 +39,13 @@ CREATE TABLE IF NOT EXISTS rides (
 );
 
 CREATE TABLE IF NOT EXISTS earnings_ledger (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  driver_id        uuid NOT NULL REFERENCES drivers (id),
-  ride_id          uuid REFERENCES rides (id),
-  gross_minor      integer NOT NULL,
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  driver_id       uuid NOT NULL REFERENCES drivers (id),
+  ride_id         uuid REFERENCES rides (id),
+  gross_minor     integer NOT NULL,
   commission_minor integer NOT NULL,
-  net_minor        integer NOT NULL,
-  commission_bps   integer NOT NULL,
-  currency         text NOT NULL DEFAULT 'USD',
-  created_at       timestamptz NOT NULL DEFAULT now()
+  net_minor       integer NOT NULL,
+  commission_bps  integer NOT NULL,
+  currency        text NOT NULL DEFAULT 'USD',
+  created_at      timestamptz NOT NULL DEFAULT now()
 );

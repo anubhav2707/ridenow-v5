@@ -1,0 +1,32 @@
+# Fly.io deploy config for the RideNow API. The image is deploy-ready, but
+# provisioning the reachable URL + injecting DATABASE_URL and provider secrets
+# is a HUMAN-GATED step — no secrets are committed here.
+app = "ridenow-v5-api"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  NODE_ENV = "production"
+  OTP_PROVIDER = "mock"
+  PAYMENT_PROVIDER = "mock"
+  GEO_PROVIDER = "mock"
+  # DATABASE_URL and any real TWILIO_*/STRIPE_* values are set via
+  # `fly secrets set ...` at deploy time — never committed.
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.checks]
+    [http_service.checks.health]
+      method = "get"
+      path = "/health"
+      interval = "15s"
+      timeout = "5s"
+      grace_period = "10s"

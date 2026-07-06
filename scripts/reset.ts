@@ -1,8 +1,8 @@
-// Thin wrapper so `tsx scripts/reset.ts` (root `pnpm db:reset`) rebuilds the local
-// DB deterministically. The guard against non-local DATABASE_URL lives in @ridenow/db.
+// Thin wrapper so the documented `scripts/reset.ts` entrypoint drives the
+// canonical reset implemented in @ridenow/db (which refuses non-local URLs).
 import { runReset } from "@ridenow/db";
 
-runReset().catch((err: unknown) => {
+runReset().catch((err) => {
   console.error("[reset] failed:", err);
   process.exit(1);
 });

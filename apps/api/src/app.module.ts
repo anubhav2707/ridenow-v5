@@ -1,34 +1,27 @@
 import { Module } from "@nestjs/common";
+import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
-import { ProvidersModule } from "./providers/providers.module";
-import { CoreLoopModule } from "./core-loop/core-loop.module";
+import { AuthModule } from "./auth/auth.module";
+import { RidesModule } from "./rides/rides.module";
+import { DriversModule } from "./drivers/drivers.module";
+import { PaymentsModule } from "./payments/payments.module";
+import { GeoModule } from "./geo/geo.module";
+import { EarningsModule } from "./earnings/earnings.module";
 import { TrackingModule } from "./tracking/tracking.module";
-import { AuthModule } from "./modules/auth.module";
-import { RidersModule } from "./modules/riders.module";
-import { DriversModule } from "./modules/drivers.module";
-import { RidesModule } from "./modules/rides.module";
-import { PaymentsModule } from "./modules/payments.module";
-import { GeoModule } from "./modules/geo.module";
-import { EarningsModule } from "./modules/earnings.module";
+import { CoreLoopModule } from "./core-loop/core-loop.module";
 
-/**
- * Root module. The domain modules below are structural stubs — one per downstream
- * feature story — that already sit on the ports-and-adapters wiring (ProvidersModule)
- * so a story only has to fill in behaviour, never re-plumb the boundaries.
- */
 @Module({
   imports: [
-    ProvidersModule,
+    DatabaseModule,
     HealthModule,
-    CoreLoopModule,
-    TrackingModule,
     AuthModule,
-    RidersModule,
-    DriversModule,
     RidesModule,
+    DriversModule,
     PaymentsModule,
     GeoModule,
     EarningsModule,
+    TrackingModule,
+    CoreLoopModule,
   ],
 })
 export class AppModule {}

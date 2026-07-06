@@ -1,35 +1,44 @@
-import { type ReactElement } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { fetchCoreLoop, formatMoney } from "./api";
+import { useState } from "react";
+import { SignupFlow } from "./auth/SignupFlow";
 import { MapView } from "./MapView";
 
-export function App(): ReactElement {
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["core-loop"],
-    queryFn: fetchCoreLoop,
-  });
+const SESSION_KEY = "ridenow.session";
+
+export default function App() {
+  const [session, setSession] = useState<string | null>(() =>
+    typeof localStorage === "undefined"
+      ? null
+      : localStorage.getItem(SESSION_KEY),
+  );
+
+  function handleAuthenticated(token: string) {
+    localStorage.setItem(SESSION_KEY, token);
+    setSession(token);
+  }
+
+  function signOut() {
+    localStorage.removeItem(SESSION_KEY);
+    setSession(null);
+  }
+
+  if (!session) {
+    return (
+      <main style={{ maxWidth: 420, margin: "3rem auto", fontFamily: "system-ui" }}>
+        <SignupFlow onAuthenticated={handleAuthenticated} />
+      </main>
+    );
+  }
 
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", maxWidth: 720, margin: "0 auto", padding: 16 }}>
-      <h1>RideNow — Rider</h1>
-      <p>Upfront transparent fare quote + live driver tracking (walking-skeleton demo).</p>
+    <main style={{ fontFamily: "system-ui" }}>
+      <header style={{ display: "flex", justifyContent: "space-between", padding: "1rem" }}>
+        <strong>RideNow</strong>
+        <button type="button" onClick={signOut}>
+          Sign out
+        </button>
+      </header>
       <MapView />
-      <section style={{ marginTop: 16 }}>
-        <button onClick={() => void refetch()}>Get a quote (run core loop)</button>
-        {isLoading && <p>Loading…</p>}
-        {error instanceof Error && <p style={{ color: "crimson" }}>Error: {error.message}</p>}
-        {data && (
-          <div>
-            <p>
-              <strong>Trip:</strong> {data.transitions.join(" → ")}
-            </p>
-            <p>
-              <strong>Upfront fare:</strong> {formatMoney(data.quote.total)} for{" "}
-              {(data.quote.distanceMeters / 1000).toFixed(2)} km
-            </p>
-          </div>
-        )}
-      </section>
+      <p style={{ padding: "1rem" }}>Ready to request a ride.</p>
     </main>
   );
 }

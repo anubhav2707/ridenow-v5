@@ -2,27 +2,29 @@
   "name": "ridenow-v5",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@9.15.9",
+  "description": "RideNow v5 — rider + driver ride-hailing walking skeleton (monorepo)",
+  "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=20 <21"
   },
   "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "format": "prettier --check .",
-    "format:write": "prettier --write .",
-    "db:migrate": "pnpm --filter @ridenow/db run migrate",
-    "db:seed": "pnpm --filter @ridenow/db run seed",
-    "db:reset": "tsx scripts/reset.ts"
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "db:migrate": "pnpm --filter @ridenow/db migrate",
+    "db:seed": "pnpm --filter @ridenow/db seed",
+    "db:reset": "tsx scripts/reset.ts",
+    "check:manifests": "node scripts/check-manifests.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md}\""
   },
   "devDependencies": {
-    "@ridenow/config": "workspace:*",
-    "prettier": "^3.4.2",
-    "tsx": "^4.19.2",
-    "turbo": "^2.3.3",
-    "typescript": "^5.7.2"
+    "@ridenow/db": "workspace:*",
+    "prettier": "3.9.4",
+    "tsx": "4.23.0",
+    "turbo": "2.10.3",
+    "typescript": "5.9.3"
   }
 }

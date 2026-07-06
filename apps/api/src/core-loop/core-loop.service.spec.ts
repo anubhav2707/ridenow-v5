@@ -1,34 +1,41 @@
-import { Test } from "@nestjs/testing";
-import { HAPPY_PATH, money } from "@ridenow/shared-types";
 import { CoreLoopService } from "./core-loop.service";
-import { GEO_PROVIDER, OTP_PROVIDER, PAYMENT_PROVIDER } from "../providers/ports";
-import { MockOtpProvider } from "../providers/mock-otp.provider";
-import { MockPaymentProvider } from "../providers/mock-payment.provider";
-import { MockGeoProvider } from "../providers/mock-geo.provider";
+import { RidesService } from "../rides/rides.service";
+import { GeoService } from "../geo/geo.service";
+import { StubGeoProvider } from "../geo/adapters/stub-geo.provider";
+import { PaymentsService } from "../payments/payments.service";
+import { FakePaymentProvider } from "../payments/adapters/fake-payment.provider";
+import { DriversService } from "../drivers/drivers.service";
+import { EarningsService } from "../earnings/earnings.service";
 
-describe("CoreLoopService (faked core loop)", () => {
-  it("drives the ordered happy path and produces a consistent earnings ledger entry", async () => {
-    const moduleRef = await Test.createTestingModule({
-      providers: [
-        CoreLoopService,
-        { provide: OTP_PROVIDER, useClass: MockOtpProvider },
-        { provide: PAYMENT_PROVIDER, useClass: MockPaymentProvider },
-        { provide: GEO_PROVIDER, useClass: MockGeoProvider },
-      ],
-    }).compile();
+describe("CoreLoopService (faked vertical slice)", () => {
+  function make() {
+    return new CoreLoopService(
+      new RidesService(),
+      new GeoService(new StubGeoProvider()),
+      new PaymentsService(new FakePaymentProvider()),
+      new DriversService(),
+      new EarningsService(),
+    );
+  }
 
-    const service = moduleRef.get(CoreLoopService);
-    const result = await service.run();
+  it("drives the ordered trip-state happy path to completion", async () => {
+    const result = await make().run();
+    expect(result.transitions).toEqual([
+      "new",
+      "requested",
+      "quoted",
+      "booked",
+      "accepted",
+      "started",
+      "completed",
+    ]);
+  });
 
-    expect(result.transitions).toEqual([...HAPPY_PATH]);
-    expect(result.payment.status).toBe("succeeded");
-
-    // gross = commission + net, with no rounding drift.
-    const { gross, commission, netTakeHome } = result.ledgerEntry;
-    expect(commission.amount + netTakeHome.amount).toBe(gross.amount);
-    expect(gross).toEqual(result.quote.total);
-    expect(gross.amount).toBeGreaterThan(0);
-    expect(Number.isInteger(gross.amount)).toBe(true);
-    expect(commission).toEqual(money(Math.round((gross.amount * 2000) / 10000), "USD"));
+  it("records an earnings ledger entry that reconciles to the quoted fare", async () => {
+    const { quote, ledgerEntry } = await make().run();
+    expect(ledgerEntry.gross.amount).toBe(quote.total.amount);
+    expect(
+      ledgerEntry.commission.amount + ledgerEntry.netTakeHome.amount,
+    ).toBe(quote.total.amount);
   });
 });

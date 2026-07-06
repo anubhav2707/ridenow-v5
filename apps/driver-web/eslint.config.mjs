@@ -1,3 +1,6 @@
-import config from "@ridenow/config/eslint";
+import react from "@ridenow/config/eslint-react";
 
-export default config;
+export default [
+  ...react,
+  { ignores: ["dist/**"] },
+];

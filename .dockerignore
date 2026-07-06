@@ -1,11 +1,7 @@
 **/node_modules
 **/dist
-**/build
 **/.turbo
-**/.vite
 **/coverage
 .git
+.github
 *.log
-.env
-.env.*
-!.env.example

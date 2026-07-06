@@ -1,23 +1,15 @@
 import { Module } from "@nestjs/common";
-import { AppConfig } from "../config/app-config";
-import { OTP_PROVIDER } from "./otp.port";
-import { ConsoleOtpProvider } from "./console-otp.provider";
+import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
+import { OTP_PROVIDER } from "./ports/otp-provider";
+import { ConsoleOtpProvider } from "./adapters/console-otp.provider";
 
 @Module({
+  controllers: [AuthController],
   providers: [
-    ConsoleOtpProvider,
-    {
-      provide: OTP_PROVIDER,
-      inject: [AppConfig, ConsoleOtpProvider],
-      useFactory: (cfg: AppConfig, mock: ConsoleOtpProvider) => {
-        if (cfg.otpProvider === "mock") return mock;
-        throw new Error(
-          `OTP_PROVIDER='${cfg.otpProvider}' is not implemented yet (real Twilio is deferred to the auth story)`,
-        );
-      },
-    },
     AuthService,
+    // Mock adapter by default. The real Twilio adapter swaps in here.
+    { provide: OTP_PROVIDER, useClass: ConsoleOtpProvider },
   ],
   exports: [AuthService],
 })

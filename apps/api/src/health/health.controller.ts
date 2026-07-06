@@ -1,5 +1,9 @@
 import { Controller, Get } from "@nestjs/common";
-import { HealthCheck, HealthCheckService, HealthCheckResult } from "@nestjs/terminus";
+import {
+  HealthCheck,
+  HealthCheckService,
+  type HealthCheckResult,
+} from "@nestjs/terminus";
 import { DbHealthIndicator } from "./db.health";
 
 @Controller("health")
@@ -9,7 +13,11 @@ export class HealthController {
     private readonly db: DbHealthIndicator,
   ) {}
 
-  /** GET /health — 200 when Postgres + PostGIS are reachable, 503 otherwise. */
+  /**
+   * Readiness probe. Returns 200 when Postgres + PostGIS are reachable, 503
+   * otherwise. Consumed by docker-compose, the CI smoke gate, and the deploy
+   * health check.
+   */
   @Get()
   @HealthCheck()
   check(): Promise<HealthCheckResult> {

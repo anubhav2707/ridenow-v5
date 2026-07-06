@@ -1,25 +1,28 @@
-# dependencies
+# Dependencies
 node_modules/
 
-# build output
+# Build output
 dist/
 build/
 *.tsbuildinfo
 
-# turbo / vite caches
+# Turbo
 .turbo/
-.vite/
+
+# Test coverage
 coverage/
 
-# drizzle generated artifacts (committed migrations under packages/db/migrations are NOT ignored)
-packages/db/drizzle/
-*.local
-
-# env — real secrets never committed. .env.example IS committed.
+# Env — never commit real secrets. .env.example IS committed.
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
 
-# logs / os
-*.log
+# Drizzle generated introspection artifacts (committed migrations live in
+# packages/db/migrations and are NOT ignored)
+packages/db/drizzle/
+
+# Editor / OS
 .DS_Store
+*.log
+.idea/
+.vscode/

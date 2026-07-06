@@ -1,20 +1,13 @@
-import { Controller, Get, Header } from "@nestjs/common";
+import { Controller, Post } from "@nestjs/common";
 import { CoreLoopService, type CoreLoopResult } from "./core-loop.service";
 
-@Controller("loop")
+@Controller("core-loop")
 export class CoreLoopController {
   constructor(private readonly loop: CoreLoopService) {}
 
-  /** GET /loop/run — the faked core loop as structured JSON. */
-  @Get("run")
+  /** Drive one faked ride end-to-end. Exercised by scripts/watch-loop.sh. */
+  @Post("run")
   run(): Promise<CoreLoopResult> {
     return this.loop.run();
-  }
-
-  /** GET /loop/watch — the same loop as a human-readable text summary. */
-  @Get("watch")
-  @Header("content-type", "text/plain; charset=utf-8")
-  watch(): Promise<string> {
-    return this.loop.runText();
   }
 }

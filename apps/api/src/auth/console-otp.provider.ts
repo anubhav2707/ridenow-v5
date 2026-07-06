@@ -1,12 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { OtpProvider } from "./otp.port";
+import type { OtpChallenge, OtpProvider } from "./otp.port";
 
-/** Mock OTP adapter: "delivers" the code by logging it (dev-visible). */
+/** Deterministic OTP stub: logs the code (as the real dev mode does too). */
 @Injectable()
 export class ConsoleOtpProvider implements OtpProvider {
-  private readonly logger = new Logger("ConsoleOtpProvider");
+  private readonly logger = new Logger(ConsoleOtpProvider.name);
 
-  async sendOtp(phone: string, code: string): Promise<void> {
-    this.logger.log(`OTP for ${phone} is ${code} (dev mock — no SMS sent)`);
+  send(phone: string): Promise<OtpChallenge> {
+    const code = "000000";
+    this.logger.log(`(dev) OTP for ${phone} is ${code}`);
+    return Promise.resolve({ phone, code });
   }
 }

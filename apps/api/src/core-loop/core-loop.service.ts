@@ -1,77 +1,123 @@
-import { Injectable } from "@nestjs/common";
-import type {
-  EarningsLedgerEntry,
-  FareQuote,
-  LngLat,
-  TripState,
+import { Inject, Injectable, Logger } from "@nestjs/common";
+import {
+  DEFAULT_COMMISSION_BPS,
+  HAPPY_PATH,
+  applyEvent,
+  computeFare,
+  computeTakeHome,
+  type FareQuote,
+  type LngLat,
+  type TripEvent,
+  type TripState,
 } from "@ridenow/shared-types";
-import { RidesService } from "../rides/rides.service";
-import { GeoService } from "../geo/geo.service";
-import { PaymentsService } from "../payments/payments.service";
-import { DriversService } from "../drivers/drivers.service";
-import { EarningsService } from "../earnings/earnings.service";
+import { OTP_PROVIDER, type OtpProvider } from "../auth/otp.port";
+import { GEO_PROVIDER, type GeoProvider } from "../geo/geo.port";
+import { PAYMENT_PROVIDER, type PaymentProvider } from "../payments/payment.port";
+import { CORE_LOOP_STORE, type CoreLoopStore, type StoredLedgerEntry } from "./core-loop.store";
+
+export interface TransitionLog {
+  event: TripEvent;
+  from: TripState;
+  to: TripState;
+}
 
 export interface CoreLoopResult {
   rideId: string;
-  transitions: TripState[];
+  states: TripState[];
+  transitions: TransitionLog[];
   quote: FareQuote;
-  driverId: string;
-  authorizationId: string;
-  ledgerEntry: EarningsLedgerEntry;
+  payment: { id: string; status: "succeeded" };
+  ledgerEntry: StoredLedgerEntry;
 }
 
+// Canned pickup/dropoff (near the seeded SF drivers) so the loop is deterministic.
 const PICKUP: LngLat = { lng: -122.4194, lat: 37.7749 };
-const DROPOFF: LngLat = { lng: -122.4094, lat: 37.7849 };
+const DROPOFF: LngLat = { lng: -122.4084, lat: 37.7859 };
+const RIDER_PHONE = "+15551230001";
+
+const HAPPY_EVENTS: TripEvent[] = ["REQUEST", "QUOTE", "BOOK", "ACCEPT", "START", "COMPLETE"];
 
 /**
- * The FAKED core loop: a real vertical slice that drives one ride through the
- * shared trip state machine (new -> requested -> quoted -> booked -> accepted ->
- * started -> completed) over the MOCK adapters (stub geo, fake payments), then
- * records the earnings ledger entry. No product features — just proof the
- * boundaries fit together end-to-end.
+ * The FAKED vertical slice: drives one ride through the real trip state machine
+ * end-to-end over the mock provider ports, persisting each transition and the
+ * resulting earnings ledger entry. No product features — just proof the wiring
+ * and contracts line up across the whole stack.
  */
 @Injectable()
 export class CoreLoopService {
+  private readonly logger = new Logger(CoreLoopService.name);
+
   constructor(
-    private readonly rides: RidesService,
-    private readonly geo: GeoService,
-    private readonly payments: PaymentsService,
-    private readonly drivers: DriversService,
-    private readonly earnings: EarningsService,
+    @Inject(GEO_PROVIDER) private readonly geo: GeoProvider,
+    @Inject(PAYMENT_PROVIDER) private readonly payments: PaymentProvider,
+    @Inject(OTP_PROVIDER) private readonly otp: OtpProvider,
+    @Inject(CORE_LOOP_STORE) private readonly store: CoreLoopStore,
   ) {}
 
   async run(): Promise<CoreLoopResult> {
-    const ride = this.rides.create(); // 'new'
-    const transitions: TripState[] = [ride.state];
+    const route = await this.geo.route(PICKUP, DROPOFF);
+    const quote = computeFare(route);
 
-    transitions.push(this.rides.apply(ride.id, "REQUEST").state);
+    const driverId = await this.store.pickOnlineDriver();
+    const ride = await this.store.createRide({ pickup: PICKUP, dropoff: DROPOFF, currency: quote.currency });
 
-    const quote = await this.geo.quote(PICKUP, DROPOFF);
-    transitions.push(this.rides.apply(ride.id, "QUOTE").state);
+    const transitions: TransitionLog[] = [];
+    let state: TripState = "new";
+    for (const event of HAPPY_EVENTS) {
+      const from = state;
+      const to = applyEvent(from, event);
+      await this.applySideEffects(event, to, ride.id, driverId, quote);
+      transitions.push({ event, from, to });
+      state = to;
+    }
 
-    const auth = await this.payments.authorize(quote.total, ride.id);
-    transitions.push(this.rides.apply(ride.id, "BOOK").state);
+    const payment = await this.payments.charge(quote.total, ride.id);
+    const { commission, netTakeHome } = computeTakeHome(quote.total, DEFAULT_COMMISSION_BPS);
+    const ledgerEntry = await this.store.recordEarnings({
+      driverId,
+      rideId: ride.id,
+      gross: quote.total,
+      commission,
+      netTakeHome,
+      commissionBps: DEFAULT_COMMISSION_BPS,
+    });
 
-    const driverId =
-      (await this.geo.nearestDriverId(PICKUP)) ?? "seed-driver-ada";
-    this.drivers.acceptRide(driverId, ride.id);
-    transitions.push(this.rides.apply(ride.id, "ACCEPT").state);
-
-    // OTP trip start (mocked) then GPS/drive.
-    transitions.push(this.rides.apply(ride.id, "START").state);
-
-    await this.payments.capture(auth.authorizationId);
-    transitions.push(this.rides.apply(ride.id, "COMPLETE").state);
-
-    const ledgerEntry = this.earnings.record(driverId, ride.id, quote.total);
+    this.logger.log(
+      `core loop complete for ride ${ride.id}: gross ${quote.total.amount} -> net ${netTakeHome.amount} ${quote.currency}`,
+    );
 
     return {
       rideId: ride.id,
+      states: [...HAPPY_PATH],
       transitions,
       quote,
-      driverId,
-      authorizationId: auth.authorizationId,
+      payment: { id: payment.id, status: payment.status },
       ledgerEntry,
     };
+  }
+
+  /** Wire each transition's real-world effect to the mock adapter that owns it. */
+  private async applySideEffects(
+    event: TripEvent,
+    to: TripState,
+    rideId: string,
+    driverId: string,
+    quote: FareQuote,
+  ): Promise<void> {
+    switch (event) {
+      case "QUOTE":
+        await this.store.setRideState(rideId, to, quote.total.amount);
+        return;
+      case "ACCEPT":
+        await this.store.assignDriver(rideId, driverId);
+        await this.store.setRideState(rideId, to);
+        return;
+      case "START":
+        await this.otp.send(RIDER_PHONE); // faked trip-start OTP
+        await this.store.setRideState(rideId, to);
+        return;
+      default:
+        await this.store.setRideState(rideId, to);
+    }
   }
 }

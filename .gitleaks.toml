@@ -1,0 +1,17 @@
+# gitleaks config for RideNow v5. Uses the default rule set; the scaffold commits
+# NO secrets (.env is gitignored, .env.example holds only blank placeholders).
+title = "RideNow gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Non-secret placeholders and fixtures."
+paths = [
+  '''\.env\.example$''',
+  '''pnpm-lock\.yaml$''',
+]
+regexes = [
+  # Local-only dev DB credentials (documented, non-secret).
+  '''postgres://ridenow:ridenow@''',
+]

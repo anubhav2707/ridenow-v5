@@ -2,15 +2,19 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "module": "CommonJS",
-    "moduleResolution": "Node10",
+    "moduleResolution": "Node",
     "target": "ES2022",
+    "lib": ["ES2022"],
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "strictPropertyInitialization": false,
-    "outDir": "dist",
-    "rootDir": "src",
-    "baseUrl": ".",
-    "types": ["node", "jest"]
+    "useDefineForClassFields": false,
+    "declaration": false,
+    "declarationMap": false,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node", "jest"],
+    "skipLibCheck": true
   },
-  "include": ["src", "test"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules"]
 }

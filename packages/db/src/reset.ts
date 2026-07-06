@@ -1,5 +1,5 @@
 import { createSql } from "./client.js";
-import { loadEnv, getDatabaseUrl, assertLocalDatabase } from "./env.js";
+import { assertLocalDatabase, getDatabaseUrl, loadEnv } from "./env.js";
 import { runMigrations } from "./migrate.js";
 import { runSeed } from "./seed.js";
 
@@ -11,7 +11,6 @@ export async function runReset(): Promise<void> {
   loadEnv();
   const url = getDatabaseUrl();
   assertLocalDatabase(url);
-
   const sql = createSql(url);
   try {
     console.log("[reset] dropping tables");

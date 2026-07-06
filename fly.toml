@@ -1,15 +1,12 @@
-# Fly.io deploy config for the RideNow API container. The image is deploy-ready;
-# actually provisioning the reachable URL, a Postgres+PostGIS instance, and the
-# DATABASE_URL secret is a HUMAN-GATED step (`fly secrets set ...`). NO secrets
-# are committed here.
+# Deploy config for the RideNow API container. Provisioning the reachable URL and
+# its secrets (DATABASE_URL etc.) is a HUMAN-GATED step — no secrets live in this repo.
 app = "ridenow-v5-api"
-primary_region = "sjc"
+primary_region = "iad"
 
 [build]
   dockerfile = "apps/api/Dockerfile"
 
 [env]
-  NODE_ENV = "production"
   PORT = "3000"
   OTP_PROVIDER = "mock"
   PAYMENT_PROVIDER = "mock"
@@ -18,14 +15,13 @@ primary_region = "sjc"
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 0
 
   [[http_service.checks]]
-    grace_period = "15s"
     interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
     method = "GET"
     path = "/health"
-    protocol = "http"
-    timeout = "3s"

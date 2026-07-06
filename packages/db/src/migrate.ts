@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createSql, type Sql } from "./client.js";
-import { loadEnv, getDatabaseUrl } from "./env.js";
+import { getDatabaseUrl, loadEnv } from "./env.js";
 
 const MIGRATIONS_DIR = resolve(__dirname, "..", "migrations");
 
@@ -20,10 +20,8 @@ export async function runMigrations(sql: Sql): Promise<string[]> {
     name text PRIMARY KEY,
     applied_at timestamptz NOT NULL DEFAULT now()
   )`;
-
   const appliedRows = await sql<{ name: string }[]>`SELECT name FROM _migrations`;
   const applied = new Set(appliedRows.map((r) => r.name));
-
   const ran: string[] = [];
   for (const file of migrationFiles()) {
     if (applied.has(file)) continue;

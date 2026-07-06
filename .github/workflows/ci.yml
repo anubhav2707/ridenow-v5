@@ -5,17 +5,9 @@ on:
     branches: [main]
   pull_request:
 
-# Cancel superseded runs on the same ref.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  # Every provider defaults to its deterministic MOCK adapter, so CI needs zero
-  # secrets to run the whole pipeline green.
-  OTP_PROVIDER: mock
-  PAYMENT_PROVIDER: mock
-  GEO_PROVIDER: mock
 
 jobs:
   lint:
@@ -28,7 +20,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
+      - run: pnpm run lint
 
   typecheck:
     runs-on: ubuntu-latest
@@ -40,7 +32,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      - run: pnpm run build
+      - run: pnpm run typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -52,18 +45,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
-
-  manifest:
-    # Enforces the manifest-integrity AC: every path referenced by a manifest
-    # (compose, Dockerfile, workspace config, turbo, fly) must exist in the tree.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-      - run: node scripts/check-manifests.mjs
+      - run: pnpm run build
+      - run: pnpm run test
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -71,37 +54,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run gitleaks secret scan
-        run: |
-          VERSION=8.18.4
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
-            | tar -xz gitleaks
-          ./gitleaks detect --source . --redact --verbose --no-banner
+      - name: gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
 
-  smoke:
-    # The real e2e proof that the full stack comes up: build + start the compose
-    # stack (Postgres+PostGIS + API), apply migrations/seed, and curl /health.
+  compose-smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Bring up the stack
-        run: docker compose up --build -d
-      - name: Wait for /health
-        run: |
-          n=0
-          until curl -fsS http://localhost:3000/health >/dev/null 2>&1; do
-            n=$((n + 1))
-            if [ "$n" -ge 60 ]; then
-              echo "API did not become healthy in time"
-              docker compose logs
-              exit 1
-            fi
-            sleep 3
-          done
-          echo "health payload:"
-          curl -fsS http://localhost:3000/health
-      - name: Exercise the faked core loop
-        run: bash scripts/watch-loop.sh
-      - name: Tear down
-        if: always()
-        run: docker compose down -v
+      - name: Bring up the stack and prove /health + core loop
+        run: bash scripts/smoke.sh

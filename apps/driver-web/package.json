@@ -1,15 +1,15 @@
 {
   "name": "@ridenow/driver-web",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "RideNow driver web app — Vite + React + MapLibre (keyless OSM tiles).",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 5174",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint ."
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "echo \"no unit tests for driver-web yet\""
   },
   "dependencies": {
     "@ridenow/shared-types": "workspace:*",

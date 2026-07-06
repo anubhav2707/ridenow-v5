@@ -1,4 +1,12 @@
-import { customType, pgTable, uuid, text, boolean, integer, timestamp } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  customType,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 /**
  * PostGIS `geography(Point,4326)` column. Kept as a custom type so the hot

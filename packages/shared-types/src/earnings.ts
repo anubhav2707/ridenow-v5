@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MoneySchema, type Money, applyBasisPoints, subtractMoney } from "./money.js";
+import { MoneySchema, applyBasisPoints, subtractMoney, type Money } from "./money.js";
 
 /** Platform take rate in basis points (2000 bps === 20%). */
 export const DEFAULT_COMMISSION_BPS = 2000;

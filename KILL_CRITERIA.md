@@ -1,44 +1,38 @@
 # Kill criteria — RideNow v5
 
-A green CI pipeline proves the **software** stands up. It does **not** prove the
-**business** works. These criteria are pre-registered here, at scaffold time, so
-that a passing build is never mistaken for product validation and so we know in
-advance what evidence would make us stop.
+Pre-registered so a **green pipeline is never mistaken for product validation**. The
+scaffold proves the stack *runs*; it proves nothing about whether the marketplace *works*.
+These are the conditions under which we stop, pivot, or shut the product down.
 
-## What "green" here does and does not mean
+## 1. Two-sided liquidity
 
-- **Does mean:** the walking skeleton installs from a committed lockfile, lints,
-  typechecks, tests, and the full local stack (Postgres+PostGIS + API) boots and
-  serves `/health` and the faked core loop.
-- **Does NOT mean:** riders want the product, drivers will supply liquidity, or
-  the unit economics survive real-world costs. All external providers are
-  deterministic mocks; no real money, SMS, KYC, or map routing has happened.
+A ride-hailing marketplace is worthless without both sides present at the same time/place.
 
-## Kill / pivot criteria (marketplace)
+- **Kill if** in a chosen launch geo we cannot reach the liquidity floor where the median
+  rider request finds an available driver within a target ETA (e.g. **< 7 min**) for a
+  sustained period — despite incentive spend.
+- **Watch:** requests-with-no-driver rate, driver idle time, rider request→match rate.
 
-Stop or pivot if, once real features and a pilot market exist, any of these hold:
+## 2. Unit economics (with REAL costs)
 
-1. **Two-sided liquidity fails.** In a chosen pilot geography we cannot sustain
-   enough online drivers to hold median rider ETA under a usable threshold
-   (e.g. > 10 min) at the demand we can generate — i.e. the chicken-and-egg
-   never breaks even in one market.
-2. **Unit economics are negative after real costs.** Per-trip contribution stays
-   negative once *real* payment processing fees, insurance, driver incentives,
-   support, and fraud/chargeback losses are loaded in — not just the modeled
-   commission split. Transparent take-home that is honest but unviable is still
-   unviable.
-3. **Retention doesn't compound.** Neither riders nor drivers return at a rate
-   that lets CAC be recovered within an acceptable payback window.
+The faked loop uses a 20% take rate and zero real costs. Real economics must include
+insurance, payment processing (Stripe), support, incentives, and driver churn.
 
-## Assumptions to validate before scaling (not before shipping the skeleton)
+- **Kill if** fully-loaded contribution margin per completed trip stays **negative** at
+  realistic take rates that riders and drivers both tolerate, with no credible path to
+  positive as volume grows.
+- **Watch:** contribution margin/trip **after** insurance + payment fees + incentives;
+  CAC payback for both riders and drivers.
 
-- Riders will accept an upfront, no-surge-surprise quote over incumbents.
-- Drivers value transparent, exact take-home enough to switch supply.
-- Keyless OSM routing (OSRM/Nominatim) is accurate enough for fare quoting in
-  the pilot geography, or self-hosting is affordable.
+## 3. Regulatory / insurance viability
 
-## Explicitly out of scope for this scaffold (deferred, not decided)
+- **Kill if** operating legally in the target market requires licensing or per-trip
+  insurance whose cost structurally breaks criterion #2, with no viable alternative.
 
-Self-hosted OSRM/Nominatim, real Twilio OTP, real Stripe test-mode payments, and
-all feature logic. Each lands behind the provider ports already wired here as a
-DI/config swap, not a refactor.
+## What a green CI does and does NOT mean
+
+- ✅ The stack builds, types check, tests pass, and the stack boots on localhost.
+- ✅ The faked core loop transitions a trip new→completed and produces a ledger entry.
+- ❌ It does **not** mean riders want it, drivers will supply it, or the economics close.
+
+Revisit this document at every feature story and before any launch decision.

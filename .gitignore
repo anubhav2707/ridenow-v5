@@ -1,34 +1,25 @@
-# Dependencies
+# dependencies
 node_modules/
-.pnpm-store/
 
-# Build output
+# build output
 dist/
 build/
-.turbo/
 *.tsbuildinfo
 
-# Test / coverage
+# turbo / vite caches
+.turbo/
+.vite/
 coverage/
-.vitest/
 
-# Env & secrets (committed template is .env.example)
+# drizzle generated artifacts (committed migrations under packages/db/migrations are NOT ignored)
+packages/db/drizzle/
+*.local
+
+# env — real secrets never committed. .env.example IS committed.
 .env
 .env.*
 !.env.example
 
-# Drizzle generated artifacts (committed SQL migrations are kept)
-packages/db/drizzle/meta/_journal.json.bak
-
-# Editor / OS
-.DS_Store
-.idea/
-.vscode/*
-!.vscode/extensions.json
+# logs / os
 *.log
-npm-debug.log*
-pnpm-debug.log*
-
-# Vite
-apps/*/dist/
-apps/*/.vite/
+.DS_Store

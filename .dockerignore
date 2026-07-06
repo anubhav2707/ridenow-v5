@@ -2,9 +2,10 @@
 **/dist
 **/build
 **/.turbo
-**/coverage
 **/.vite
+**/coverage
 .git
-.github
 *.log
-apps/*/dist
+.env
+.env.*
+!.env.example

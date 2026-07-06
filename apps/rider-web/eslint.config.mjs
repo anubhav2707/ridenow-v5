@@ -1,3 +1,3 @@
-import react from "@ridenow/config/eslint-react";
+import config from "@ridenow/config/eslint";
 
-export default react;
+export default config;

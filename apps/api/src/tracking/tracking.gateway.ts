@@ -7,25 +7,27 @@ import {
 } from "@nestjs/websockets";
 import type { Server } from "socket.io";
 import { LocationPingSchema } from "@ridenow/shared-types";
-import { parseBody } from "../common/zod";
 
 /**
- * Live-GPS tracking gateway (stub). Gives driver location pings a home so the
- * live-tracking story wires the rider map to real broadcasts without moving the
- * transport. Socket.IO is loaded only when the app actually listens.
+ * Stubbed live-tracking gateway so driver GPS has a home from day one. It
+ * validates and re-broadcasts location pings; the map subscription / room fan-out
+ * lands with the live-tracking story.
  */
-@WebSocketGateway({ cors: { origin: "*" } })
+@WebSocketGateway({ cors: true, namespace: "/tracking" })
 export class TrackingGateway {
   private readonly logger = new Logger("TrackingGateway");
 
   @WebSocketServer()
   server!: Server;
 
-  @SubscribeMessage("location:update")
-  onLocationUpdate(@MessageBody() body: unknown): { ok: true } {
-    const ping = parseBody(LocationPingSchema, body);
-    this.logger.debug(`location ${ping.driverId} -> ${ping.at.lng},${ping.at.lat}`);
-    this.server?.emit(`driver:${ping.driverId}:location`, ping);
+  @SubscribeMessage("driver:location")
+  handleLocation(@MessageBody() body: unknown): { ok: boolean } {
+    const parsed = LocationPingSchema.safeParse(body);
+    if (!parsed.success) {
+      this.logger.warn("rejected malformed location ping");
+      return { ok: false };
+    }
+    this.server.emit(`ride:${parsed.data.driverId}:location`, parsed.data);
     return { ok: true };
   }
 }

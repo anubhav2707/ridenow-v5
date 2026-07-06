@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MoneySchema, type Money, addMoney, money } from "./money.js";
+import { MoneySchema, money, addMoney } from "./money.js";
 
 /**
  * A transparent, upfront fare quote. Every component is integer minor units so
@@ -44,12 +44,10 @@ export interface RouteEstimate {
 export function computeFare(route: RouteEstimate, tariff: FareTariff = DEFAULT_TARIFF): FareQuote {
   const km = route.distanceMeters / 1000;
   const minutes = route.durationSeconds / 60;
-
   const baseFare = money(tariff.baseFareMinor, tariff.currency);
   const distanceComponent = money(Math.round(km * tariff.perKmMinor), tariff.currency);
   const timeComponent = money(Math.round(minutes * tariff.perMinuteMinor), tariff.currency);
-  const total: Money = addMoney(addMoney(baseFare, distanceComponent), timeComponent);
-
+  const total = addMoney(addMoney(baseFare, distanceComponent), timeComponent);
   return FareQuoteSchema.parse({
     currency: tariff.currency,
     baseFare,

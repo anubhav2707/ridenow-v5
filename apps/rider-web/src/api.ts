@@ -1,50 +1,37 @@
-import type { EarningsLedgerEntry, FareQuote, LngLat, TripState } from "@ridenow/shared-types";
-
-const BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
-
-export interface RideView {
-  rideId: string;
-  state: TripState;
-  history: TripState[];
-  quote: FareQuote | null;
-  driverId: string | null;
+export interface MoneyJson {
+  amount: number;
+  currency: string;
 }
 
-export interface AcceptResult extends RideView {
-  startOtp: string;
+export interface CoreLoop {
+  transitions: string[];
+  quote: {
+    total: MoneyJson;
+    baseFare: MoneyJson;
+    distanceComponent: MoneyJson;
+    timeComponent: MoneyJson;
+    distanceMeters: number;
+    durationSeconds: number;
+  };
+  ledgerEntry: {
+    gross: MoneyJson;
+    commission: MoneyJson;
+    netTakeHome: MoneyJson;
+    commissionBps: number;
+  };
 }
 
-export interface CompleteResult extends RideView {
-  ledgerEntry: EarningsLedgerEntry;
-}
+export const API_URL: string =
+  (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:3000";
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
-  // Build the body/headers conditionally: exactOptionalPropertyTypes forbids
-  // assigning `undefined` to RequestInit's optional `body`.
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    ...(body === undefined
-      ? {}
-      : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
-  });
+export async function fetchCoreLoop(): Promise<CoreLoop> {
+  const res = await fetch(`${API_URL}/loop/run`);
   if (!res.ok) {
-    throw new Error(`${path} responded ${res.status}`);
+    throw new Error(`API responded ${res.status}`);
   }
-  return (await res.json()) as T;
+  return (await res.json()) as CoreLoop;
 }
 
-export interface FakedTrip {
-  quoted: RideView;
-  accepted: AcceptResult;
-  completed: CompleteResult;
-}
-
-/** Drive the faked core loop through the API and return each milestone. */
-export async function runFakedTrip(pickup: LngLat, dropoff: LngLat): Promise<FakedTrip> {
-  const quoted = await post<RideView>("/rides/quote", { pickup, dropoff });
-  await post<RideView>(`/rides/${quoted.rideId}/book`);
-  const accepted = await post<AcceptResult>(`/rides/${quoted.rideId}/accept`);
-  await post<RideView>(`/rides/${quoted.rideId}/start`, { otp: accepted.startOtp });
-  const completed = await post<CompleteResult>(`/rides/${quoted.rideId}/complete`);
-  return { quoted, accepted, completed };
+export function formatMoney(m: MoneyJson): string {
+  return `${m.currency} ${(m.amount / 100).toFixed(2)}`;
 }

@@ -46,7 +46,7 @@ export const HAPPY_PATH: readonly TripState[] = [
 const CANCELLABLE: readonly TripState[] = ["requested", "quoted", "booked", "accepted"];
 
 /** state -> event -> next state. The exhaustive legal-transition table. */
-const TRANSITIONS: Readonly<Record<TripState, Partial<Record<TripEvent, TripState>>>> = {
+const TRANSITIONS: Record<TripState, Partial<Record<TripEvent, TripState>>> = {
   new: { REQUEST: "requested" },
   requested: { QUOTE: "quoted", CANCEL: "cancelled" },
   quoted: { BOOK: "booked", CANCEL: "cancelled" },

@@ -1,41 +1,52 @@
 import { Test } from "@nestjs/testing";
-import { HealthModule } from "./health.module";
+import { TerminusModule } from "@nestjs/terminus";
 import { HealthController } from "./health.controller";
-import { DbReadiness } from "./db-readiness";
+import { DbHealthIndicator } from "./db.health";
 
 describe("HealthController", () => {
-  it("reports ok when Postgres + PostGIS are reachable", async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [HealthModule] })
-      .overrideProvider(DbReadiness)
-      .useValue({ check: async () => ({ ok: true, postgisVersion: "3.4 (mock)" }) })
-      .compile();
+  it("returns status 'ok' with the PostGIS version when the DB is reachable", async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [TerminusModule],
+      controllers: [HealthController],
+      providers: [
+        {
+          provide: DbHealthIndicator,
+          useValue: {
+            isHealthy: async () => ({
+              database: { status: "up", postgisVersion: "3.4 USE_GEOS=1" },
+            }),
+          },
+        },
+      ],
+    }).compile();
 
     const controller = moduleRef.get(HealthController);
     const result = await controller.check();
 
     expect(result.status).toBe("ok");
-    expect(result.info?.postgis?.status).toBe("up");
-    expect(result.details.postgis).toMatchObject({
-      status: "up",
-      postgisVersion: "3.4 (mock)",
-    });
-
-    await moduleRef.close();
+    expect(result.details.database?.status).toBe("up");
+    expect(result.details.database?.postgisVersion).toContain("3.4");
   });
 
-  it("fails the health check when the PostGIS probe throws", async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [HealthModule] })
-      .overrideProvider(DbReadiness)
-      .useValue({
-        check: async () => {
-          throw new Error("connection refused");
+  it("reports 'error' when the DB indicator fails", async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [TerminusModule],
+      controllers: [HealthController],
+      providers: [
+        {
+          provide: DbHealthIndicator,
+          useValue: {
+            isHealthy: async () => {
+              throw Object.assign(new Error("db down"), {
+                causes: { database: { status: "down" } },
+              });
+            },
+          },
         },
-      })
-      .compile();
+      ],
+    }).compile();
 
     const controller = moduleRef.get(HealthController);
     await expect(controller.check()).rejects.toBeDefined();
-
-    await moduleRef.close();
   });
 });

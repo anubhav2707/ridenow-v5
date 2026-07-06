@@ -1,18 +1,18 @@
 import { Controller, Get } from "@nestjs/common";
-import { HealthCheck, HealthCheckService, type HealthCheckResult } from "@nestjs/terminus";
-import { PostgisHealthIndicator } from "./postgis.health";
+import { HealthCheck, HealthCheckService, HealthCheckResult } from "@nestjs/terminus";
+import { DbHealthIndicator } from "./db.health";
 
 @Controller("health")
 export class HealthController {
   constructor(
     private readonly health: HealthCheckService,
-    private readonly postgis: PostgisHealthIndicator,
+    private readonly db: DbHealthIndicator,
   ) {}
 
-  /** GET /health — readiness: process is up AND Postgres+PostGIS are reachable. */
+  /** GET /health — 200 when Postgres + PostGIS are reachable, 503 otherwise. */
   @Get()
   @HealthCheck()
   check(): Promise<HealthCheckResult> {
-    return this.health.check([() => this.postgis.isHealthy("postgis")]);
+    return this.health.check([() => this.db.isHealthy("database")]);
   }
 }

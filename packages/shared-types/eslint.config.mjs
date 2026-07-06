@@ -1,3 +1,3 @@
-import base from "@ridenow/config/eslint";
+import config from "@ridenow/config/eslint";
 
-export default base;
+export default config;

@@ -1,12 +1,10 @@
 {
   "name": "ridenow-v5",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
-  "description": "RideNow v5 — rider + driver ride-hailing product (walking skeleton).",
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@9.15.9",
   "engines": {
-    "node": ">=20.11.0",
-    "pnpm": ">=9.0.0"
+    "node": ">=20"
   },
   "scripts": {
     "build": "turbo run build",
@@ -14,12 +12,11 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "format": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,yml,yaml}\"",
-    "format:write": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,yml,yaml}\"",
-    "db:migrate": "pnpm --filter @ridenow/db migrate",
-    "db:seed": "pnpm --filter @ridenow/db seed",
-    "db:reset": "tsx scripts/reset.ts",
-    "manifest:check": "node scripts/check-manifests.mjs"
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "db:migrate": "pnpm --filter @ridenow/db run migrate",
+    "db:seed": "pnpm --filter @ridenow/db run seed",
+    "db:reset": "tsx scripts/reset.ts"
   },
   "devDependencies": {
     "@ridenow/config": "workspace:*",

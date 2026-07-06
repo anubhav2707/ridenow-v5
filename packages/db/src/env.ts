@@ -1,8 +1,8 @@
-import { config as loadDotenv } from "dotenv";
+import { config } from "dotenv";
 
 /** Load a repo-root .env if present. Safe to call multiple times. */
 export function loadEnv(): void {
-  loadDotenv();
+  config();
 }
 
 export function getDatabaseUrl(): string {

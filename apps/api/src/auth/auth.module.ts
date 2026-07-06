@@ -1,16 +1,16 @@
 import { Module } from "@nestjs/common";
-import { AuthController } from "./auth.controller";
-import { AuthService } from "./auth.service";
-import { OTP_PROVIDER } from "./ports/otp-provider";
-import { ConsoleOtpProvider } from "./adapters/console-otp.provider";
+import { OTP_PROVIDER, type OtpProvider } from "./otp.port";
+import { ConsoleOtpProvider } from "./console-otp.provider";
+
+/** Selects the OTP adapter from OTP_PROVIDER (mock by default). */
+function selectOtpProvider(): OtpProvider {
+  const mode = process.env.OTP_PROVIDER ?? "mock";
+  if (mode === "mock") return new ConsoleOtpProvider();
+  throw new Error(`OTP_PROVIDER="${mode}" is not implemented in the scaffold (deferred to the auth story)`);
+}
 
 @Module({
-  controllers: [AuthController],
-  providers: [
-    AuthService,
-    // Mock adapter by default. The real Twilio adapter swaps in here.
-    { provide: OTP_PROVIDER, useClass: ConsoleOtpProvider },
-  ],
-  exports: [AuthService],
+  providers: [{ provide: OTP_PROVIDER, useFactory: selectOtpProvider }],
+  exports: [OTP_PROVIDER],
 })
 export class AuthModule {}

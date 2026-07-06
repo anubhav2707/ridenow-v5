@@ -1,38 +1,37 @@
-# Kill criteria — RideNow v5
+# RideNow v5 — Pre-registered Kill Criteria
 
-Pre-registered so a **green pipeline is never mistaken for product validation**. The
-scaffold proves the stack *runs*; it proves nothing about whether the marketplace *works*.
-These are the conditions under which we stop, pivot, or shut the product down.
+A green CI pipeline proves the **software** works. It does **not** prove the
+**business** works. These criteria are registered up front, at scaffold time, so
+that later a passing test suite is never mistaken for product/market validation.
+Ride-hailing is a two-sided marketplace with brutal unit economics; kill early
+if the numbers below don't hold.
 
 ## 1. Two-sided liquidity
+- **Kill if** in a target launch zone we cannot sustain a median rider
+  request-to-match time under ~5 minutes with < 10% unfulfilled requests during
+  peak, at any realistic driver supply we can actually recruit.
+- Rationale: without both sides showing up at the same place and time, every
+  other metric is vanity. Liquidity is the product.
 
-A ride-hailing marketplace is worthless without both sides present at the same time/place.
+## 2. Unit economics with REAL costs
+- **Kill if** contribution margin per completed trip is negative once ALL real
+  costs are included, with no credible path to positive at scale:
+  - payment processing (Stripe) fees on the gross fare,
+  - insurance / driver liability,
+  - support + dispute + chargeback cost,
+  - incentives/subsidies required to keep both sides active.
+- The scaffold models money as exact integer minor units and commission in basis
+  points precisely so these numbers can be measured without rounding drift — but
+  the *default 20% take rate is a placeholder*, not a validated margin.
 
-- **Kill if** in a chosen launch geo we cannot reach the liquidity floor where the median
-  rider request finds an available driver within a target ETA (e.g. **< 7 min**) for a
-  sustained period — despite incentive spend.
-- **Watch:** requests-with-no-driver rate, driver idle time, rider request→match rate.
+## 3. Regulatory / trust wall
+- **Kill if** mandatory driver background checks, local licensing, or insurance
+  requirements make legal operation infeasible or uneconomic in target markets.
 
-## 2. Unit economics (with REAL costs)
+## What this scaffold deliberately does NOT prove
+- That anyone wants the product (no demand signal).
+- That drivers will accept the take-home the ledger computes.
+- That the mock OTP/payment/geo adapters reflect real-world latency, failure
+  rates, or cost.
 
-The faked loop uses a 20% take rate and zero real costs. Real economics must include
-insurance, payment processing (Stripe), support, incentives, and driver churn.
-
-- **Kill if** fully-loaded contribution margin per completed trip stays **negative** at
-  realistic take rates that riders and drivers both tolerate, with no credible path to
-  positive as volume grows.
-- **Watch:** contribution margin/trip **after** insurance + payment fees + incentives;
-  CAC payback for both riders and drivers.
-
-## 3. Regulatory / insurance viability
-
-- **Kill if** operating legally in the target market requires licensing or per-trip
-  insurance whose cost structurally breaks criterion #2, with no viable alternative.
-
-## What a green CI does and does NOT mean
-
-- ✅ The stack builds, types check, tests pass, and the stack boots on localhost.
-- ✅ The faked core loop transitions a trip new→completed and produces a ledger entry.
-- ❌ It does **not** mean riders want it, drivers will supply it, or the economics close.
-
-Revisit this document at every feature story and before any launch decision.
+Revisit these before investing in the feature stories that build on this repo.

@@ -1,21 +1,14 @@
 import { Module } from "@nestjs/common";
-import { CoreLoopService } from "./core-loop.service";
-import { CoreLoopController } from "./core-loop.controller";
-import { RidesModule } from "../rides/rides.module";
+import { AuthModule } from "../auth/auth.module";
 import { GeoModule } from "../geo/geo.module";
 import { PaymentsModule } from "../payments/payments.module";
-import { DriversModule } from "../drivers/drivers.module";
-import { EarningsModule } from "../earnings/earnings.module";
+import { CoreLoopController } from "./core-loop.controller";
+import { CoreLoopService } from "./core-loop.service";
+import { CORE_LOOP_STORE, PgCoreLoopStore } from "./core-loop.store";
 
 @Module({
-  imports: [
-    RidesModule,
-    GeoModule,
-    PaymentsModule,
-    DriversModule,
-    EarningsModule,
-  ],
+  imports: [GeoModule, PaymentsModule, AuthModule],
   controllers: [CoreLoopController],
-  providers: [CoreLoopService],
+  providers: [CoreLoopService, { provide: CORE_LOOP_STORE, useClass: PgCoreLoopStore }],
 })
 export class CoreLoopModule {}

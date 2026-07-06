@@ -1,12 +1,12 @@
-import base from "@ridenow/config/eslint-base";
+import config from "@ridenow/config/eslint";
 
 export default [
-  ...base,
+  ...config,
   {
+    // NestJS relies on emitted decorator metadata, so injected class types must
+    // be VALUE imports — disable the type-import rule that would erase them.
     rules: {
-      // NestJS relies heavily on decorators + DI; the decorator itself is the
-      // "use" of many parameter properties.
-      "@typescript-eslint/no-extraneous-class": "off",
+      "@typescript-eslint/consistent-type-imports": "off",
     },
   },
 ];

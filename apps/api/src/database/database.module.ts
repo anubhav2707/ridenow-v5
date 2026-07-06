@@ -1,23 +1,32 @@
-import { Global, Module } from "@nestjs/common";
-import { createSql, type Sql } from "@ridenow/db";
-import { loadApiConfig } from "../config/env";
-
-/** DI token for the shared postgres.js client. */
-export const SQL = Symbol("SQL");
+import { Global, Module, type OnApplicationShutdown } from "@nestjs/common";
+import { Inject } from "@nestjs/common";
+import { createSql, getDatabaseUrl, loadEnv } from "@ridenow/db";
+import type { Sql } from "postgres";
+import { DB_SQL } from "./database.tokens";
 
 /**
- * Provides a single lazy postgres.js client to the whole app. postgres.js does
- * not open a socket until the first query, so constructing this at boot is safe
- * even when the DB is not yet reachable (the /health endpoint reports on that).
+ * Provides the single shared postgres.js client to the whole app. Global so any
+ * feature module can inject DB_SQL without re-importing this module. The client
+ * connects lazily, so the app boots even before Postgres is reachable — only a
+ * query (e.g. /health) exercises the connection.
  */
 @Global()
 @Module({
   providers: [
     {
-      provide: SQL,
-      useFactory: (): Sql => createSql(loadApiConfig().databaseUrl),
+      provide: DB_SQL,
+      useFactory: (): Sql => {
+        loadEnv();
+        return createSql(getDatabaseUrl());
+      },
     },
   ],
-  exports: [SQL],
+  exports: [DB_SQL],
 })
-export class DatabaseModule {}
+export class DatabaseModule implements OnApplicationShutdown {
+  constructor(@Inject(DB_SQL) private readonly sql: Sql) {}
+
+  async onApplicationShutdown(): Promise<void> {
+    await this.sql.end({ timeout: 5 });
+  }
+}

@@ -1,13 +1,14 @@
-import { Controller, Post } from "@nestjs/common";
+import { Controller, HttpCode, Post } from "@nestjs/common";
 import { CoreLoopService, type CoreLoopResult } from "./core-loop.service";
 
 @Controller("core-loop")
 export class CoreLoopController {
-  constructor(private readonly loop: CoreLoopService) {}
+  constructor(private readonly service: CoreLoopService) {}
 
-  /** Drive one faked ride end-to-end. Exercised by scripts/watch-loop.sh. */
+  /** Run the faked end-to-end trip loop and return the transitions + ledger. */
   @Post("run")
+  @HttpCode(200)
   run(): Promise<CoreLoopResult> {
-    return this.loop.run();
+    return this.service.run();
   }
 }

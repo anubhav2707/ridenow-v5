@@ -1,10 +1,14 @@
-/** DI token for the OTP delivery port. */
-export const OTP_PROVIDER = Symbol("OTP_PROVIDER");
+export interface OtpChallenge {
+  phone: string;
+  code: string;
+}
 
 /**
- * Port for one-time-password delivery. The mock adapter logs the code; the real
- * Twilio adapter is deferred (a DI swap gated on TWILIO_* secrets).
+ * Port for sending a phone OTP. The scaffold ships a console adapter (also the
+ * dev behaviour of the real one); a later story swaps in Twilio Verify.
  */
 export interface OtpProvider {
-  sendOtp(phone: string, code: string): Promise<void>;
+  send(phone: string): Promise<OtpChallenge>;
 }
+
+export const OTP_PROVIDER = Symbol("OTP_PROVIDER");
